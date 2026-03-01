@@ -19,3 +19,21 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ## Notes
 - Local MVP adapters write runtime data to `backend/data/`.
 - This data directory is ignored by git and will be replaced with Firestore + object storage adapters later.
+
+## Firestore mode
+By default metadata backend is `local`.
+For Firestore backend, `backend/.env` is required.
+
+Example `backend/.env`:
+
+```env
+CADRELAY_METADATA_BACKEND=firestore
+FIREBASE_PROJECT_ID=cad-relay
+GOOGLE_APPLICATION_CREDENTIALS=C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsvc-74a9ebbd37.json
+```
+
+Then run server normally:
+
+```powershell
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```

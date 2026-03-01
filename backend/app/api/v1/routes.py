@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
-from app.services.local_db import add_approval, create_model_version, get_model_version, update_model_version
+from app.services.metadata_store import add_approval, create_model_version, get_model_version, update_model_version
 from app.services.queue import enqueue_conversion
 from app.services.storage import save_original_bytes
 
