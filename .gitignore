@@ -31,3 +31,6 @@ pnpm-debug.log*
 *.log
 tmp/
 .cache/
+
+# Python packaging
+*.egg-info/

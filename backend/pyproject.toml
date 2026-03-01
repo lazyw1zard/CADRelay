@@ -3,7 +3,7 @@ name = "cadrelay-services"
 version = "0.1.0"
 description = "Backend and worker services for CADRelay MVP"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.116.0",
   "uvicorn[standard]>=0.35.0",
@@ -22,3 +22,4 @@ line-length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
