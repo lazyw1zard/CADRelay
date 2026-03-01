@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from app.core.config import settings
+
+
+def _ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
+    if not path.exists():
+        return default
+    with path.open("r", encoding="utf-8") as fp:
+        return json.load(fp)
+
+
+def _write_json(path: Path, value: dict[str, Any]) -> None:
+    _ensure_parent(path)
+    with path.open("w", encoding="utf-8") as fp:
+        json.dump(value, fp, ensure_ascii=True, indent=2)
+
+
+def init_metadata_store() -> None:
+    data = _load_json(settings.metadata_file, default={})
+    data.setdefault("model_versions", {})
+    data.setdefault("approvals", [])
+    _write_json(settings.metadata_file, data)
+
+
+def create_model_version(record: dict[str, Any]) -> dict[str, Any]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    data["model_versions"][record["id"]] = record
+    _write_json(settings.metadata_file, data)
+    return record
+
+
+def get_model_version(model_version_id: str) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    return data["model_versions"].get(model_version_id)
+
+
+def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    current = data["model_versions"].get(model_version_id)
+    if current is None:
+        return None
+    current.update(updates)
+    data["model_versions"][model_version_id] = current
+    _write_json(settings.metadata_file, data)
+    return current
+
+
+def add_approval(record: dict[str, Any]) -> dict[str, Any]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    data["approvals"].append(record)
+    _write_json(settings.metadata_file, data)
+    return record

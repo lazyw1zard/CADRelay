@@ -17,3 +17,17 @@
 - Added root `.gitignore`.
 - Created first commit:
   - `1f25b2a chore: bootstrap python mvp scaffold`
+- Implemented local MVP vertical slice (no external services):
+  - `POST /api/v1/uploads` (multipart upload, validation, checksum)
+  - local file storage adapter (`backend/data/storage`)
+  - local metadata adapter (`backend/data/metadata.json`)
+  - local queue adapter (`backend/data/queue.json`)
+  - `GET /api/v1/model-versions/{id}` for status polling
+- Implemented worker processing with `--once` mode:
+  - consumes pending queue message
+  - writes mock GLB artifact
+  - updates model status `processing -> ready`
+- Smoke-tested end-to-end flow successfully:
+  - upload returns `processing`
+  - worker run returns `processed`
+  - model version becomes `ready`

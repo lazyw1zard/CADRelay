@@ -1,8 +1,22 @@
 # worker
 
-Async conversion worker placeholder.
+Async conversion worker (mock conversion for MVP wiring).
 
-## Planned responsibility
-- consume conversion tasks,
-- run STEP -> GLB conversion,
-- publish status updates.
+## Local run
+
+Process one message and exit:
+```powershell
+cd C:\Projects\CADRelay
+C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --once
+```
+
+Run polling loop:
+```powershell
+cd C:\Projects\CADRelay
+C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py
+```
+
+## Current behavior
+- Reads pending messages from `backend/data/queue.json`.
+- Writes mock GLB file to `backend/data/storage/glb/`.
+- Updates model version status to `ready` in `backend/data/metadata.json`.

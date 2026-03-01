@@ -34,3 +34,7 @@ tmp/
 
 # Python packaging
 *.egg-info/
+
+# Runtime artifacts
+backend/data/
+sample.step

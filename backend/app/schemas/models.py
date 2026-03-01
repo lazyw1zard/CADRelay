@@ -11,6 +11,15 @@ class ModelVersionResponse(BaseModel):
     model_id: str
     source_format: str
     status: str
+    storage_key_original: str | None = None
+    storage_key_glb: str | None = None
+    checksum: str | None = None
+    size_bytes: int | None = None
+
+
+class UploadResponse(BaseModel):
+    model_version: ModelVersionResponse
+    queue_message_id: str
 
 
 class ApprovalDecision(BaseModel):
