@@ -12,6 +12,7 @@ def _ensure_parent(path: Path) -> None:
 
 
 def _load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
+    # Если файла еще нет, возвращаем структуру по умолчанию.
     if not path.exists():
         return default
     with path.open("r", encoding="utf-8") as fp:
@@ -19,12 +20,14 @@ def _load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
+    # Любое обновление полностью записываем обратно в json-файл.
     _ensure_parent(path)
     with path.open("w", encoding="utf-8") as fp:
         json.dump(value, fp, ensure_ascii=True, indent=2)
 
 
 def init_metadata_store() -> None:
+    # Инициализируем обязательные разделы локальной "базы".
     data = _load_json(settings.metadata_file, default={})
     data.setdefault("model_versions", {})
     data.setdefault("approvals", [])
@@ -32,6 +35,7 @@ def init_metadata_store() -> None:
 
 
 def create_model_version(record: dict[str, Any]) -> dict[str, Any]:
+    # Добавляем/перезаписываем карточку версии по ее id.
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
     data["model_versions"][record["id"]] = record
     _write_json(settings.metadata_file, data)
@@ -39,11 +43,13 @@ def create_model_version(record: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_model_version(model_version_id: str) -> dict[str, Any] | None:
+    # Читаем одну версию модели по id.
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
     return data["model_versions"].get(model_version_id)
 
 
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:
+    # Обновляем только переданные поля (например статус).
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
     current = data["model_versions"].get(model_version_id)
     if current is None:
@@ -55,6 +61,7 @@ def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any
 
 
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
+    # Добавляем запись о решении клиента в журнал approvals.
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
     data["approvals"].append(record)
     _write_json(settings.metadata_file, data)

@@ -9,6 +9,7 @@ from app.core.config import settings
 
 
 def _load_queue() -> dict[str, Any]:
+    # Если очередь еще не создана, работаем с пустым списком сообщений.
     if not settings.queue_file.exists():
         return {"messages": []}
     with settings.queue_file.open("r", encoding="utf-8") as fp:
@@ -16,12 +17,14 @@ def _load_queue() -> dict[str, Any]:
 
 
 def _save_queue(queue: dict[str, Any]) -> None:
+    # Сохраняем текущее состояние очереди в файл.
     settings.queue_file.parent.mkdir(parents=True, exist_ok=True)
     with settings.queue_file.open("w", encoding="utf-8") as fp:
         json.dump(queue, fp, ensure_ascii=True, indent=2)
 
 
 def enqueue_conversion(model_version_id: str, storage_key_original: str) -> str:
+    # Добавляем задачу "нужна конвертация" со статусом pending.
     queue = _load_queue()
     message_id = f"msg_{uuid4().hex[:12]}"
     queue["messages"].append(

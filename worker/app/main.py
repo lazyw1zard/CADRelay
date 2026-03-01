@@ -26,6 +26,7 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def process_next_message(data_dir: Path) -> bool:
+    # Берем пути к локальным файлам очереди/метаданных/артефактов.
     queue_file = data_dir / "queue.json"
     metadata_file = data_dir / "metadata.json"
     storage_dir = data_dir / "storage"
@@ -33,10 +34,12 @@ def process_next_message(data_dir: Path) -> bool:
     queue = _load_json(queue_file, {"messages": []})
     metadata = _load_json(metadata_file, {"model_versions": {}, "approvals": []})
 
+    # Ищем первую задачу, которая еще не обработана.
     pending = next((m for m in queue["messages"] if m.get("status") == "pending"), None)
     if pending is None:
         return False
 
+    # Проверяем, что в задаче есть id версии модели.
     payload = pending.get("payload", {})
     model_version_id = payload.get("model_version_id")
     if not model_version_id:
@@ -45,6 +48,7 @@ def process_next_message(data_dir: Path) -> bool:
         _write_json(queue_file, queue)
         return True
 
+    # Проверяем, что такая версия модели вообще существует.
     record = metadata["model_versions"].get(model_version_id)
     if record is None:
         pending["status"] = "failed"
@@ -52,17 +56,19 @@ def process_next_message(data_dir: Path) -> bool:
         _write_json(queue_file, queue)
         return True
 
-    # Mock conversion artifact to validate e2e wiring.
+    # Пока это заглушка: создаем тестовый GLB, чтобы проверить весь pipeline.
     glb_key = f"glb/{model_version_id}.glb"
     glb_path = storage_dir / glb_key
     glb_path.parent.mkdir(parents=True, exist_ok=True)
     glb_path.write_bytes(b"mock glb payload")
 
+    # Помечаем модель как готовую после "конвертации".
     record["status"] = "ready"
     record["storage_key_glb"] = glb_key
     record["updated_at"] = datetime.now(UTC).isoformat()
     metadata["model_versions"][model_version_id] = record
 
+    # Помечаем задачу в очереди как обработанную.
     pending["status"] = "processed"
     pending["processed_at"] = datetime.now(UTC).isoformat()
 
@@ -75,6 +81,7 @@ def run_forever(data_dir: Path, poll_interval: float) -> None:
     while True:
         processed = process_next_message(data_dir)
         if not processed:
+            # Если задач нет, немного ждем и проверяем снова.
             time.sleep(poll_interval)
 
 
@@ -87,7 +94,9 @@ if __name__ == "__main__":
 
     target_dir = Path(args.data_dir)
     if args.once:
+        # Удобно для ручной проверки: обработать 1 задачу и завершиться.
         changed = process_next_message(target_dir)
         print("processed" if changed else "idle")
     else:
+        # Режим демона: worker постоянно слушает очередь.
         run_forever(target_dir, poll_interval=args.poll_interval)
