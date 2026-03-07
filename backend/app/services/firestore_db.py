@@ -37,6 +37,22 @@ def get_model_version(model_version_id: str) -> dict[str, Any] | None:
     return doc.to_dict()
 
 
+def list_model_versions(
+    owner_user_id: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    client = _get_client()
+    docs = client.collection("model_versions").stream()
+    rows = [d.to_dict() for d in docs if d.exists]
+    if owner_user_id:
+        rows = [r for r in rows if r.get("owner_user_id") == owner_user_id]
+    if status:
+        rows = [r for r in rows if r.get("status") == status]
+    rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    return rows[: max(1, min(limit, 200))]
+
+
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:
     client = _get_client()
     ref = client.collection("model_versions").document(model_version_id)

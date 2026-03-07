@@ -7,7 +7,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.config import settings
 from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
-from app.services.metadata_store import add_approval, create_model_version, get_model_version, update_model_version
+from app.services.metadata_store import (
+    add_approval,
+    create_model_version,
+    get_model_version,
+    list_model_versions,
+    update_model_version,
+)
 from app.services.queue import enqueue_conversion
 from app.services.storage_store import save_original_bytes
 
@@ -16,10 +22,27 @@ router = APIRouter()
 ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs"}
 
 
+def _resolve_user_fields(
+    owner_user_id: str | None,
+    created_by_user_id: str | None,
+    auth_provider: str | None,
+    auth_subject: str | None,
+) -> tuple[str, str, str, str]:
+    owner = owner_user_id or created_by_user_id or "demo_user"
+    creator = created_by_user_id or owner
+    provider = auth_provider or "dev"
+    subject = auth_subject or creator
+    return owner, creator, provider, subject
+
+
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
     model_id: str = Form(...),
     source_format: str = Form("step"),
+    owner_user_id: str | None = Form(None),
+    created_by_user_id: str | None = Form(None),
+    auth_provider: str | None = Form(None),
+    auth_subject: str | None = Form(None),
     file: UploadFile = File(...),
 ) -> UploadResponse:
     # Нормализуем и проверяем формат, чтобы не тащить неподдерживаемые файлы дальше.
@@ -36,6 +59,12 @@ async def upload_model(
 
     # Генерируем id версии модели и сохраняем оригинальный файл.
     model_version_id = f"mv_{uuid4().hex[:12]}"
+    owner, creator, provider, subject = _resolve_user_fields(
+        owner_user_id=owner_user_id,
+        created_by_user_id=created_by_user_id,
+        auth_provider=auth_provider,
+        auth_subject=auth_subject,
+    )
     try:
         storage_key_original, checksum, size_bytes = save_original_bytes(
             model_version_id=model_version_id,
@@ -53,6 +82,11 @@ async def upload_model(
             "model_id": model_id,
             "source_format": normalized_format,
             "status": "uploaded",
+            "owner_user_id": owner,
+            "created_by_user_id": creator,
+            "updated_by_user_id": creator,
+            "auth_provider": provider,
+            "auth_subject": subject,
             "storage_key_original": storage_key_original,
             "storage_key_glb": None,
             "checksum": checksum,
@@ -66,7 +100,7 @@ async def upload_model(
         model_version_id=record["id"],
         storage_key_original=record["storage_key_original"],
     )
-    record = update_model_version(record["id"], status="processing")
+    record = update_model_version(record["id"], status="processing", updated_by_user_id=creator)
     if record is None:
         raise HTTPException(status_code=500, detail="Failed to update model version")
 
@@ -80,12 +114,23 @@ async def upload_model(
 def create_model_version_endpoint(payload: ModelVersionCreate) -> ModelVersionResponse:
     # Служебный endpoint: создает запись версии без загрузки файла.
     model_version_id = f"mv_{uuid4().hex[:12]}"
+    owner, creator, provider, subject = _resolve_user_fields(
+        owner_user_id=payload.owner_user_id,
+        created_by_user_id=payload.created_by_user_id,
+        auth_provider=payload.auth_provider,
+        auth_subject=payload.auth_subject,
+    )
     record = create_model_version(
         {
             "id": model_version_id,
             "model_id": payload.model_id,
             "source_format": payload.source_format,
             "status": "uploaded",
+            "owner_user_id": owner,
+            "created_by_user_id": creator,
+            "updated_by_user_id": creator,
+            "auth_provider": provider,
+            "auth_subject": subject,
             "storage_key_original": None,
             "storage_key_glb": None,
             "checksum": None,
@@ -94,6 +139,16 @@ def create_model_version_endpoint(payload: ModelVersionCreate) -> ModelVersionRe
         }
     )
     return ModelVersionResponse(**record)
+
+
+@router.get("/model-versions", response_model=list[ModelVersionResponse])
+def list_model_versions_endpoint(
+    owner_user_id: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[ModelVersionResponse]:
+    rows = list_model_versions(owner_user_id=owner_user_id, status=status, limit=limit)
+    return [ModelVersionResponse(**row) for row in rows]
 
 
 @router.get("/model-versions/{model_version_id}", response_model=ModelVersionResponse)
@@ -117,6 +172,7 @@ def approve_model_version(model_version_id: str, payload: ApprovalDecision) -> d
             "model_version_id": model_version_id,
             "decision": payload.decision,
             "comment": payload.comment,
+            "created_by_user_id": payload.created_by_user_id or record.get("created_by_user_id"),
             "created_at": datetime.now(UTC).isoformat(),
         }
     )

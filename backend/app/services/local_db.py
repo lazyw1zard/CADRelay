@@ -48,6 +48,21 @@ def get_model_version(model_version_id: str) -> dict[str, Any] | None:
     return data["model_versions"].get(model_version_id)
 
 
+def list_model_versions(
+    owner_user_id: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    rows = list(data["model_versions"].values())
+    if owner_user_id:
+        rows = [r for r in rows if r.get("owner_user_id") == owner_user_id]
+    if status:
+        rows = [r for r in rows if r.get("status") == status]
+    rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    return rows[: max(1, min(limit, 200))]
+
+
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:
     # Обновляем только переданные поля (например статус).
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})

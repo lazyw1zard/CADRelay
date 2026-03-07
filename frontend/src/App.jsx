@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 
@@ -11,11 +11,27 @@ async function apiGetModelVersion(id) {
   return resp.json();
 }
 
+// Получить список версий моделей (с фильтрацией по owner_user_id).
+async function apiListModelVersions({ ownerUserId }) {
+  const qs = new URLSearchParams();
+  if (ownerUserId) qs.set("owner_user_id", ownerUserId);
+  qs.set("limit", "100");
+  const resp = await fetch(`${API_BASE}/model-versions?${qs.toString()}`, {
+    cache: "no-store",
+  });
+  if (!resp.ok) throw new Error(`list failed (${resp.status})`);
+  return resp.json();
+}
+
 // Загрузка файла модели в backend через multipart/form-data.
-async function apiUpload({ modelId, sourceFormat, file }) {
+async function apiUpload({ modelId, sourceFormat, file, ownerUserId }) {
   const form = new FormData();
   form.append("model_id", modelId);
   form.append("source_format", sourceFormat);
+  form.append("owner_user_id", ownerUserId);
+  form.append("created_by_user_id", ownerUserId);
+  form.append("auth_provider", "dev");
+  form.append("auth_subject", ownerUserId);
   form.append("file", file);
 
   const resp = await fetch(`${API_BASE}/uploads`, {
@@ -30,11 +46,11 @@ async function apiUpload({ modelId, sourceFormat, file }) {
 }
 
 // Отправить решение клиента по модели (approve/reject + комментарий).
-async function apiApproval(modelVersionId, decision, comment) {
+async function apiApproval(modelVersionId, decision, comment, ownerUserId) {
   const resp = await fetch(`${API_BASE}/model-versions/${modelVersionId}/approval`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ decision, comment: comment || null }),
+    body: JSON.stringify({ decision, comment: comment || null, created_by_user_id: ownerUserId }),
   });
   if (!resp.ok) {
     const body = await resp.text();
@@ -44,6 +60,7 @@ async function apiApproval(modelVersionId, decision, comment) {
 }
 
 export function App() {
+  const [demoUserId, setDemoUserId] = useState("demo_user_001");
   const [modelId, setModelId] = useState("model_demo_ui");
   const [sourceFormat, setSourceFormat] = useState("step");
   const [file, setFile] = useState(null);
@@ -51,6 +68,25 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [comment, setComment] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialRows() {
+      setError("");
+      try {
+        const list = await apiListModelVersions({ ownerUserId: demoUserId });
+        if (!cancelled) setRows(list);
+      } catch (err) {
+        if (!cancelled) setError(String(err.message || err));
+      }
+    }
+
+    loadInitialRows();
+    return () => {
+      cancelled = true;
+    };
+  }, [demoUserId]);
 
   async function handleUpload(e) {
     e.preventDefault();
@@ -63,7 +99,7 @@ export function App() {
     setLoading(true);
     try {
       // После загрузки сразу показываем новую строку в таблице.
-      const data = await apiUpload({ modelId, sourceFormat, file });
+      const data = await apiUpload({ modelId, sourceFormat, file, ownerUserId: demoUserId });
       const row = data.model_version;
       setRows((prev) => [row, ...prev]);
     } catch (err) {
@@ -88,7 +124,7 @@ export function App() {
     setError("");
     try {
       // Сохраняем решение, затем перечитываем статус строки.
-      await apiApproval(id, decision, comment);
+      await apiApproval(id, decision, comment, demoUserId);
       await refreshOne(id);
     } catch (err) {
       setError(String(err.message || err));
@@ -107,6 +143,11 @@ export function App() {
       <p className="muted">Upload → processing → ready</p>
 
       <form className="card" onSubmit={handleUpload}>
+        <label>
+          Demo User ID
+          <input value={demoUserId} onChange={(e) => setDemoUserId(e.target.value)} />
+        </label>
+
         <label>
           Model ID
           <input value={modelId} onChange={(e) => setModelId(e.target.value)} />
