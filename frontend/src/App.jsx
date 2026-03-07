@@ -88,6 +88,26 @@ export function App() {
     };
   }, [demoUserId]);
 
+  useEffect(() => {
+    // Автопуллинг только для строк в processing.
+    const timer = setInterval(async () => {
+      const processingIds = rows.filter((r) => r.status === "processing").map((r) => r.id);
+      if (processingIds.length === 0) return;
+
+      try {
+        const updates = await Promise.all(processingIds.map((id) => apiGetModelVersion(id)));
+        setRows((prev) => {
+          const byId = new Map(updates.map((u) => [u.id, u]));
+          return prev.map((r) => byId.get(r.id) || r);
+        });
+      } catch {
+        // Ошибки автопуллинга не блокируют UI; ручной Refresh всегда доступен.
+      }
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [rows]);
+
   async function handleUpload(e) {
     e.preventDefault();
     setError("");
