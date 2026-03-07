@@ -1,0 +1,98 @@
+:root {
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: #1a1f29;
+  background: linear-gradient(120deg, #f0f4ff 0%, #e7fff4 100%);
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.muted {
+  color: #4f5b73;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d8dfef;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+label {
+  display: block;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+input,
+select,
+button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid #bfc9df;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+button {
+  background: #0f6adf;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0c57b5;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.badge {
+  background: #e7efff;
+  color: #1345a5;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e2e8f7;
+  text-align: left;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.actions {
+  display: grid;
+  gap: 6px;
+}
+
+.error {
+  color: #b00020;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 14px;
+  }
+}
