@@ -31,6 +31,13 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return rel_key
 
 
+def load_bytes(storage_key: str) -> bytes:
+    abs_path = settings.storage_dir / storage_key
+    if not abs_path.exists():
+        raise FileNotFoundError(storage_key)
+    return abs_path.read_bytes()
+
+
 def resolve_storage_path(storage_key: str) -> Path:
     # Переводим storage_key в физический путь на диске.
     return settings.storage_dir / storage_key

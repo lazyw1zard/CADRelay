@@ -39,3 +39,7 @@ def save_original_bytes(model_version_id: str, filename: str, payload: bytes) ->
 
 def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return _backend_module().save_glb_bytes(model_version_id, payload)
+
+
+def load_bytes(storage_key: str) -> bytes:
+    return _backend_module().load_bytes(storage_key)

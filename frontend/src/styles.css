@@ -86,6 +86,17 @@ td {
   gap: 6px;
 }
 
+.actions a {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: #eef3ff;
+  color: #0f4aa5;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+}
+
 .error {
   color: #b00020;
   font-weight: 600;

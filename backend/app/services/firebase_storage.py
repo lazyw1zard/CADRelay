@@ -47,6 +47,13 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return rel_key
 
 
+def load_bytes(storage_key: str) -> bytes:
+    blob = _get_bucket().blob(storage_key)
+    if not blob.exists():
+        raise FileNotFoundError(storage_key)
+    return blob.download_as_bytes()
+
+
 def resolve_storage_path(storage_key: str) -> Path:
     # Для облачного backend нет локального пути; возвращаем key как псевдо-путь.
     return Path(storage_key)

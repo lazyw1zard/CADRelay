@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 
 from app.core.config import settings
 from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
@@ -15,7 +16,7 @@ from app.services.metadata_store import (
     update_model_version,
 )
 from app.services.queue import enqueue_conversion
-from app.services.storage_store import save_original_bytes
+from app.services.storage_store import load_bytes, save_original_bytes
 
 router = APIRouter()
 # На MVP явно разрешаем только эти форматы.
@@ -158,6 +159,32 @@ def get_model_version_endpoint(model_version_id: str) -> ModelVersionResponse:
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     return ModelVersionResponse(**record)
+
+
+@router.get("/model-versions/{model_version_id}/download")
+def download_model_version_file(
+    model_version_id: str,
+    kind: str = Query(pattern="^(original|glb)$"),
+) -> Response:
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+
+    storage_key = record.get("storage_key_original") if kind == "original" else record.get("storage_key_glb")
+    if not storage_key:
+        raise HTTPException(status_code=404, detail=f"{kind} file is not available")
+
+    try:
+        payload = load_bytes(storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"{kind} file not found in storage") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    filename = storage_key.split("/")[-1]
+    media_type = "application/octet-stream" if kind == "original" else "model/gltf-binary"
+    headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
+    return Response(content=payload, media_type=media_type, headers=headers)
 
 
 @router.post("/model-versions/{model_version_id}/approval")

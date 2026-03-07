@@ -227,6 +227,10 @@ export function App() {
                       <button onClick={() => refreshOne(r.id)}>Refresh</button>
                       <button onClick={() => approve(r.id, "approve")}>Approve</button>
                       <button onClick={() => approve(r.id, "reject")}>Reject</button>
+                      <a href={`${API_BASE}/model-versions/${r.id}/download?kind=original`}>Download Original</a>
+                      {r.storage_key_glb ? (
+                        <a href={`${API_BASE}/model-versions/${r.id}/download?kind=glb`}>Download GLB</a>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
