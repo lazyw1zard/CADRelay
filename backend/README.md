@@ -28,7 +28,9 @@ Example `backend/.env`:
 
 ```env
 CADRELAY_METADATA_BACKEND=firestore
+CADRELAY_STORAGE_BACKEND=firebase
 FIREBASE_PROJECT_ID=cad-relay
+FIREBASE_STORAGE_BUCKET=<your-firebase-storage-bucket>
 GOOGLE_APPLICATION_CREDENTIALS=C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsvc-74a9ebbd37.json
 ```
 

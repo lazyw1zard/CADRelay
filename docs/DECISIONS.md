@@ -30,3 +30,13 @@
 ### D-007: Delivery approach
 - Decision: implement vertical slices (run server -> health/docs -> upload flow -> queue/worker).
 - Rationale: end-to-end visibility and easier debugging.
+
+### D-008: Metadata backend implementation
+- Decision: implement switchable metadata backend (`local` | `firestore`) via env.
+- Rationale: keep local development simple and allow real cloud persistence when needed.
+- Consequence: current recommended setup is Firestore for metadata.
+
+### D-009: Storage backend strategy
+- Decision: implement switchable storage backend (`local` | `firebase`) and keep `local` as active default for MVP.
+- Rationale: Firebase Storage currently requires billing; project needs no-cost path.
+- Consequence: use local file storage now, enable cloud storage later without API rewrites.

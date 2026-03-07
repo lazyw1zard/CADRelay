@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
 from app.services.metadata_store import add_approval, create_model_version, get_model_version, update_model_version
 from app.services.queue import enqueue_conversion
-from app.services.storage import save_original_bytes
+from app.services.storage_store import save_original_bytes
 
 router = APIRouter()
 # На MVP явно разрешаем только эти форматы.
@@ -36,11 +36,15 @@ async def upload_model(
 
     # Генерируем id версии модели и сохраняем оригинальный файл.
     model_version_id = f"mv_{uuid4().hex[:12]}"
-    storage_key_original, checksum, size_bytes = save_original_bytes(
-        model_version_id=model_version_id,
-        filename=file.filename or "upload.step",
-        payload=payload,
-    )
+    try:
+        storage_key_original, checksum, size_bytes = save_original_bytes(
+            model_version_id=model_version_id,
+            filename=file.filename or "upload.step",
+            payload=payload,
+        )
+    except RuntimeError as exc:
+        # Ошибка конфигурации storage: клиент увидит явную проблему аутентификации/настроек.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # Создаем запись о версии модели со статусом uploaded.
     record = create_model_version(

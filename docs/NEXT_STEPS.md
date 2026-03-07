@@ -1,24 +1,24 @@
 # Next Steps
 
-## Immediate (now)
-- [x] Create and activate `backend/.venv` with Python 3.12.
-- [x] Install backend dependencies and run FastAPI locally.
-- [x] Validate endpoints:
-  - `GET /health`
-  - OpenAPI UI at `/docs`
+## Current state
+- [x] FastAPI/worker local flow works end-to-end.
+- [x] Firestore metadata backend implemented and validated.
+- [x] Firebase storage backend scaffold implemented (optional).
+- [x] Local storage remains active MVP path for now.
 
-## Vertical slice #1 (local-only)
-- [x] Implement upload endpoint (local storage adapter + local metadata adapter).
-- [x] Create conversion task contract (`conversion_requested`).
-- [x] Implement worker mock processing (`uploaded -> processing -> ready`).
-- [x] Verify end-to-end flow with one STEP sample.
+## Next session priority
+- [ ] Set `CADRELAY_STORAGE_BACKEND=local` explicitly in `backend/.env` for stable no-cost setup.
+- [ ] Re-run full manual flow and verify artifacts:
+  - upload status `processing`
+  - worker result `processed`
+  - final status `ready`
+- [ ] Add endpoint to list recent model versions (for simple UI table).
 
-## Vertical slice #2 (cloud-backed)
-- [ ] Add Firestore metadata adapter.
-- [ ] Add object storage adapter.
-- [ ] Keep domain services unchanged via repository interfaces.
+## Near-term roadmap
+- [ ] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic).
+- [ ] Add download endpoint for original CAD and GLB by `model_version_id`.
+- [ ] Start minimal frontend page: upload + status polling + approve/reject.
 
 ## Cross-platform hardening
-- [x] Add settings module with env-driven config (no hardcoded local paths).
 - [ ] Add Linux-friendly run scripts and keep PowerShell equivalents.
 - [ ] Add CI smoke checks for backend startup and lint.

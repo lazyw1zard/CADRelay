@@ -22,7 +22,10 @@ class Settings:
         self.max_upload_bytes = int(os.getenv("CADRELAY_MAX_UPLOAD_BYTES", 50 * 1024 * 1024))
         # local | firestore
         self.metadata_backend = os.getenv("CADRELAY_METADATA_BACKEND", "local").strip().lower()
+        # local | firebase
+        self.storage_backend = os.getenv("CADRELAY_STORAGE_BACKEND", "local").strip().lower()
         self.firebase_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+        self.firebase_storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
         self.google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
 
 

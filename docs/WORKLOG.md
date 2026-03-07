@@ -31,3 +31,17 @@
   - upload returns `processing`
   - worker run returns `processed`
   - model version becomes `ready`
+- Added switchable metadata backend:
+  - `app/services/metadata_store.py` facade
+  - `app/services/firestore_db.py` implementation
+  - startup and routes switched to metadata facade
+- Added `.env`-driven config loading and validation for Firestore mode.
+- Verified Firestore write path by creating model version via API and reading document directly.
+- Added switchable storage backend:
+  - `app/services/storage_store.py` facade
+  - `app/services/firebase_storage.py` implementation
+- Added strict config checks for Firebase Storage mode (`.env`, project id, credentials path, bucket).
+- Current runtime decision: keep storage backend as `local` for no-cost MVP.
+- Commit history advanced with key milestones:
+  - `32b80a5` comments in core flow
+  - `c760a3c` firestore metadata backend
