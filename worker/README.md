@@ -1,6 +1,6 @@
 # worker
 
-Async conversion worker (mock conversion for MVP wiring).
+Async conversion worker for CADRelay MVP.
 
 ## Local run
 
@@ -16,7 +16,23 @@ cd C:\Projects\CADRelay
 C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py
 ```
 
+Show queue stats:
+```powershell
+cd C:\Projects\CADRelay
+C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --queue-stats --error-limit 10
+```
+
+Prune old queue history:
+```powershell
+cd C:\Projects\CADRelay
+C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --queue-prune --prune-keep-days 7
+```
+
 ## Current behavior
 - Reads pending messages from `backend/data/queue.json`.
-- Writes mock GLB file to `backend/data/storage/glb/`.
-- Updates model version status to `ready` in `backend/data/metadata.json`.
+- Loads original CAD bytes from active storage backend (`local` or `firebase`).
+- Converts CAD (`step/stp/iges/igs`) to mesh using `gmsh` and exports GLB via `trimesh`.
+- Saves GLB to storage and updates model version status to `ready`.
+- On conversion error updates status to `failed` and stores error in queue message.
+- In `--queue-stats` mode prints counts and recent failed errors.
+- In `--queue-prune` mode removes old `processed/failed` messages.
