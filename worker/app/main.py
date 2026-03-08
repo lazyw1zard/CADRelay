@@ -8,6 +8,7 @@ import time
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 
@@ -234,7 +235,10 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
                 input_path.write_bytes(source_bytes)
 
                 # 3) Конвертируем CAD -> GLB.
+                # Замеряем только чистое время конвертации (без очереди и сетевых вызовов).
+                started_at = perf_counter()
                 glb_bytes = convert_cad_file_to_glb_bytes(input_path)
+                conversion_ms = int((perf_counter() - started_at) * 1000)
 
             # 4) Сохраняем GLB и отмечаем запись как ready.
             glb_key = save_glb_bytes(model_version_id, glb_bytes)
@@ -243,6 +247,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
                 model_version_id,
                 status="ready",
                 storage_key_glb=glb_key,
+                conversion_ms=conversion_ms,
                 updated_at=datetime.now(UTC).isoformat(),
             )
             if updated is None:
@@ -250,7 +255,9 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
 
             pending["status"] = "processed"
             pending["processed_at"] = datetime.now(UTC).isoformat()
+            pending["conversion_ms"] = conversion_ms
             _write_json(queue_file, queue)
+            print(f"conversion_ms model_version_id={model_version_id} value={conversion_ms}")
             return True, f"processed:{model_version_id}"
         except Exception as exc:  # noqa: BLE001
             _mark_pending_failed(

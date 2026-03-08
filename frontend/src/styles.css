@@ -102,8 +102,37 @@ td {
   font-weight: 600;
 }
 
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+  font-size: 13px;
+  color: #23304d;
+}
+
+.viewer-shell {
+  border: 1px solid #d4ddf2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f7f9ff;
+}
+
+.viewer-canvas {
+  width: 100%;
+  height: 420px;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 14px;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .viewer-canvas {
+    height: 320px;
   }
 }

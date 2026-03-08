@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
+// Компонент 3D-viewer грузим только когда он реально нужен (lazy-loading).
+const GlbViewer = lazy(() => import("./components/GlbViewer").then((m) => ({ default: m.GlbViewer })));
 
 // Получить актуальное состояние конкретной версии модели.
 async function apiGetModelVersion(id) {
@@ -59,6 +61,11 @@ async function apiApproval(modelVersionId, decision, comment, ownerUserId) {
   return resp.json();
 }
 
+function formatMs(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  return `${Math.round(Number(value))} ms`;
+}
+
 export function App() {
   const [demoUserId, setDemoUserId] = useState("demo_user_001");
   const [modelId, setModelId] = useState("model_demo_ui");
@@ -69,6 +76,13 @@ export function App() {
   const [error, setError] = useState("");
   const [comment, setComment] = useState("");
 
+  // Какая модель сейчас открыта в 3D-preview.
+  const [previewModelVersionId, setPreviewModelVersionId] = useState("");
+  // Метрики клиента: время загрузки GLB + треугольники.
+  const [viewerLoadMs, setViewerLoadMs] = useState(null);
+  const [viewerTriangles, setViewerTriangles] = useState(null);
+  const previewSectionRef = useRef(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -76,7 +90,12 @@ export function App() {
       setError("");
       try {
         const list = await apiListModelVersions({ ownerUserId: demoUserId });
-        if (!cancelled) setRows(list);
+        if (!cancelled) {
+          setRows(list);
+          // По умолчанию выбираем самую свежую модель со статусом ready.
+          const firstReady = list.find((r) => r.storage_key_glb);
+          if (firstReady) setPreviewModelVersionId(firstReady.id);
+        }
       } catch (err) {
         if (!cancelled) setError(String(err.message || err));
       }
@@ -157,10 +176,23 @@ export function App() {
     [rows]
   );
 
+  const previewRow = useMemo(() => rows.find((r) => r.id === previewModelVersionId) || null, [rows, previewModelVersionId]);
+
+  const previewUrl = previewRow?.storage_key_glb
+    ? `${API_BASE}/model-versions/${previewRow.id}/download?kind=glb`
+    : "";
+
+  function handleOpenPreview(row) {
+    setPreviewModelVersionId(row.id);
+    setViewerLoadMs(null);
+    setViewerTriangles(null);
+    previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <main className="page">
       <h1>CADRelay MVP</h1>
-      <p className="muted">Upload → processing → ready</p>
+      <p className="muted">Upload - processing - ready</p>
 
       <form className="card" onSubmit={handleUpload}>
         <label>
@@ -224,12 +256,15 @@ export function App() {
                   <td>{r.storage_key_glb || "-"}</td>
                   <td>
                     <div className="actions">
-                      <button onClick={() => refreshOne(r.id)}>Refresh</button>
-                      <button onClick={() => approve(r.id, "approve")}>Approve</button>
-                      <button onClick={() => approve(r.id, "reject")}>Reject</button>
+                      <button type="button" onClick={() => refreshOne(r.id)}>Refresh</button>
+                      <button type="button" onClick={() => approve(r.id, "approve")}>Approve</button>
+                      <button type="button" onClick={() => approve(r.id, "reject")}>Reject</button>
                       <a href={`${API_BASE}/model-versions/${r.id}/download?kind=original`}>Download Original</a>
                       {r.storage_key_glb ? (
-                        <a href={`${API_BASE}/model-versions/${r.id}/download?kind=glb`}>Download GLB</a>
+                        <>
+                          <a href={`${API_BASE}/model-versions/${r.id}/download?kind=glb`}>Download GLB</a>
+                          <button type="button" onClick={() => handleOpenPreview(r)}>Preview</button>
+                        </>
                       ) : null}
                     </div>
                   </td>
@@ -237,6 +272,35 @@ export function App() {
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      <section className="card" ref={previewSectionRef}>
+        <div className="row">
+          <h2>GLB Preview</h2>
+          {previewRow ? <span className="badge">{previewRow.id}</span> : null}
+        </div>
+
+        {!previewRow || !previewRow.storage_key_glb ? (
+          <p className="muted">Выбери строку со статусом ready и нажми Preview.</p>
+        ) : (
+          <>
+            <div className="metrics">
+              <div>conversion: {formatMs(previewRow.conversion_ms)}</div>
+              <div>viewer load: {formatMs(viewerLoadMs)}</div>
+              <div>triangles: {viewerTriangles ?? "-"}</div>
+            </div>
+
+            <Suspense fallback={<p className="muted">Загружаем 3D viewer...</p>}>
+              <GlbViewer
+                glbUrl={previewUrl}
+                onLoadMetrics={({ loadMs, triangles }) => {
+                  setViewerLoadMs(loadMs);
+                  setViewerTriangles(triangles);
+                }}
+              />
+            </Suspense>
+          </>
         )}
       </section>
 

@@ -24,6 +24,9 @@ class ModelVersionResponse(BaseModel):
     storage_key_glb: str | None = None
     checksum: str | None = None
     size_bytes: int | None = None
+    conversion_ms: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class UploadResponse(BaseModel):
