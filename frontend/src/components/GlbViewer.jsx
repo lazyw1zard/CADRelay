@@ -74,7 +74,6 @@ export function GlbViewer({ glbUrl, onLoadMetrics }) {
         renderer.setSize(width, height);
         host.innerHTML = "";
         host.appendChild(renderer.domElement);
-
         // Базовый свет для читаемого preview.
         const hemi = new THREE.HemisphereLight(0xffffff, 0xc7d2fe, 0.9);
         scene.add(hemi);

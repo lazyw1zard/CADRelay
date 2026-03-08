@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { generateGlbThumbnail } from "./lib/thumbnail";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 // Компонент 3D-viewer грузим только когда он реально нужен (lazy-loading).
@@ -83,7 +84,28 @@ export function App() {
   // Метрики клиента: время загрузки GLB + треугольники.
   const [viewerLoadMs, setViewerLoadMs] = useState(null);
   const [viewerTriangles, setViewerTriangles] = useState(null);
+
+  const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
+  const [thumbnailFailedById, setThumbnailFailedById] = useState({});
+  const [thumbnailsById, setThumbnailsById] = useState(() => {
+    try {
+      const raw = localStorage.getItem("cadrelay_thumbnails");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
   const previewSectionRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    // В dev StrictMode React делает mount->unmount->mount,
+    // поэтому при каждом входе в эффект выставляем true заново.
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +171,13 @@ export function App() {
       });
       const row = data.model_version;
       setRows((prev) => [row, ...prev]);
+      // Если раньше thumbnail для этого id был помечен fail, сбрасываем метку.
+      setThumbnailFailedById((prev) => {
+        if (!prev[row.id]) return prev;
+        const copy = { ...prev };
+        delete copy[row.id];
+        return copy;
+      });
     } catch (err) {
       setError(String(err.message || err));
     } finally {
@@ -189,6 +218,43 @@ export function App() {
   const previewUrl = previewRow?.storage_key_glb
     ? `${API_BASE}/model-versions/${previewRow.id}/download?kind=glb`
     : "";
+
+  const handleViewerLoadMetrics = useCallback(({ loadMs, triangles }) => {
+    setViewerLoadMs(loadMs);
+    setViewerTriangles(triangles);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("cadrelay_thumbnails", JSON.stringify(thumbnailsById));
+    } catch {
+      // Если хранилище недоступно, просто пропускаем кэш thumbnails.
+    }
+  }, [thumbnailsById]);
+
+  useEffect(() => {
+    // Генерируем thumbnail автоматически для ready-моделей, даже без ручного Preview.
+    if (thumbnailInProgressId) return;
+    const next = rows.find((r) => r.storage_key_glb && !thumbnailsById[r.id] && !thumbnailFailedById[r.id]);
+    if (!next) return;
+
+    setThumbnailInProgressId(next.id);
+    const url = `${API_BASE}/model-versions/${next.id}/download?kind=glb`;
+
+    generateGlbThumbnail(url)
+      .then((png) => {
+        if (!isMountedRef.current || !png) return;
+        setThumbnailsById((prev) => ({ ...prev, [next.id]: png }));
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        // Не зацикливаемся на битой модели: помечаем failed для thumb.
+        setThumbnailFailedById((prev) => ({ ...prev, [next.id]: true }));
+      })
+      .finally(() => {
+        if (isMountedRef.current) setThumbnailInProgressId("");
+      });
+  }, [rows, thumbnailsById, thumbnailInProgressId, thumbnailFailedById]);
 
   function handleOpenPreview(row) {
     setPreviewModelVersionId(row.id);
@@ -257,6 +323,7 @@ export function App() {
           <table>
             <thead>
               <tr>
+                <th>Thumb</th>
                 <th>ID</th>
                 <th>Status</th>
                 <th>Source</th>
@@ -267,6 +334,15 @@ export function App() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
+                  <td>
+                    {thumbnailsById[r.id] ? (
+                      <img className="table-thumb" src={thumbnailsById[r.id]} alt={`${r.id} thumbnail`} />
+                    ) : thumbnailInProgressId === r.id ? (
+                      <span className="muted">...</span>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
                   <td>{r.id}</td>
                   <td>{r.status}</td>
                   <td>{r.storage_key_original || "-"}</td>
@@ -310,13 +386,7 @@ export function App() {
             </div>
 
             <Suspense fallback={<p className="muted">Загружаем 3D viewer...</p>}>
-              <GlbViewer
-                glbUrl={previewUrl}
-                onLoadMetrics={({ loadMs, triangles }) => {
-                  setViewerLoadMs(loadMs);
-                  setViewerTriangles(triangles);
-                }}
-              />
+              <GlbViewer glbUrl={previewUrl} onLoadMetrics={handleViewerLoadMetrics} />
             </Suspense>
           </>
         )}

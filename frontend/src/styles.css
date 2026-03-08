@@ -79,6 +79,16 @@ td {
   text-align: left;
   padding: 8px;
   font-size: 13px;
+  vertical-align: top;
+}
+
+.table-thumb {
+  width: 92px;
+  height: 62px;
+  object-fit: cover;
+  border: 1px solid #d4ddf2;
+  border-radius: 6px;
+  background: #f7f9ff;
 }
 
 .actions {
@@ -135,4 +145,5 @@ td {
   .viewer-canvas {
     height: 320px;
   }
+
 }
