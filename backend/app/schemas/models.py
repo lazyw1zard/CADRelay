@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ModelVersionCreate(BaseModel):
     model_id: str = Field(min_length=1)
     source_format: str = Field(default="step", min_length=1)
+    conversion_profile: str = Field(default="balanced", pattern="^(fast|balanced|high)$")
     owner_user_id: str | None = None
     created_by_user_id: str | None = None
     auth_provider: str | None = None
@@ -14,6 +15,7 @@ class ModelVersionResponse(BaseModel):
     id: str
     model_id: str
     source_format: str
+    conversion_profile: str | None = None
     status: str
     owner_user_id: str | None = None
     created_by_user_id: str | None = None

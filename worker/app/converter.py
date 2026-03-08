@@ -6,6 +6,26 @@ import tempfile
 import gmsh
 import trimesh
 
+SUPPORTED_PROFILES = {"fast", "balanced", "high"}
+
+
+def _apply_profile(profile: str) -> str:
+    # Профили качества влияют на плотность сетки:
+    # fast -> меньше треугольников и быстрее,
+    # balanced -> базовый компромисс,
+    # high -> плотнее и точнее, но тяжелее.
+    normalized = profile.lower().strip()
+    if normalized not in SUPPORTED_PROFILES:
+        normalized = "balanced"
+
+    if normalized == "fast":
+        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 2.0)
+    elif normalized == "high":
+        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 0.6)
+    else:
+        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 1.0)
+    return normalized
+
 
 def _scene_to_single_mesh(scene: trimesh.Scene) -> trimesh.Trimesh:
     # Если trimesh вернул сцену из нескольких объектов, склеиваем их в один mesh.
@@ -15,7 +35,7 @@ def _scene_to_single_mesh(scene: trimesh.Scene) -> trimesh.Trimesh:
     return trimesh.util.concatenate(geometries)
 
 
-def convert_cad_file_to_glb_bytes(input_path: Path) -> bytes:
+def convert_cad_file_to_glb_bytes(input_path: Path, profile: str = "balanced") -> bytes:
     # 1) Через gmsh импортируем CAD (STEP/IGES), строим треугольную сетку и пишем STL.
     # 2) Через trimesh читаем STL и экспортируем GLB-байты.
     with tempfile.TemporaryDirectory(prefix="cadrelay_convert_") as tmp_dir:
@@ -25,6 +45,7 @@ def convert_cad_file_to_glb_bytes(input_path: Path) -> bytes:
         gmsh.initialize()
         try:
             gmsh.option.setNumber("General.Terminal", 0)
+            _apply_profile(profile)
             gmsh.model.add("cadrelay")
             gmsh.model.occ.importShapes(str(input_path))
             gmsh.model.occ.synchronize()

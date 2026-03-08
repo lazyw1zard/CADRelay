@@ -26,10 +26,11 @@ async function apiListModelVersions({ ownerUserId }) {
 }
 
 // Загрузка файла модели в backend через multipart/form-data.
-async function apiUpload({ modelId, sourceFormat, file, ownerUserId }) {
+async function apiUpload({ modelId, sourceFormat, conversionProfile, file, ownerUserId }) {
   const form = new FormData();
   form.append("model_id", modelId);
   form.append("source_format", sourceFormat);
+  form.append("conversion_profile", conversionProfile);
   form.append("owner_user_id", ownerUserId);
   form.append("created_by_user_id", ownerUserId);
   form.append("auth_provider", "dev");
@@ -70,6 +71,7 @@ export function App() {
   const [demoUserId, setDemoUserId] = useState("demo_user_001");
   const [modelId, setModelId] = useState("model_demo_ui");
   const [sourceFormat, setSourceFormat] = useState("step");
+  const [conversionProfile, setConversionProfile] = useState("balanced");
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -138,7 +140,13 @@ export function App() {
     setLoading(true);
     try {
       // После загрузки сразу показываем новую строку в таблице.
-      const data = await apiUpload({ modelId, sourceFormat, file, ownerUserId: demoUserId });
+      const data = await apiUpload({
+        modelId,
+        sourceFormat,
+        conversionProfile,
+        file,
+        ownerUserId: demoUserId,
+      });
       const row = data.model_version;
       setRows((prev) => [row, ...prev]);
     } catch (err) {
@@ -216,6 +224,15 @@ export function App() {
         </label>
 
         <label>
+          Conversion Profile
+          <select value={conversionProfile} onChange={(e) => setConversionProfile(e.target.value)}>
+            <option value="fast">fast (быстрее, грубее)</option>
+            <option value="balanced">balanced (по умолчанию)</option>
+            <option value="high">high (точнее, тяжелее)</option>
+          </select>
+        </label>
+
+        <label>
           File
           <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>
@@ -286,6 +303,7 @@ export function App() {
         ) : (
           <>
             <div className="metrics">
+              <div>profile: {previewRow.conversion_profile || "-"}</div>
               <div>conversion: {formatMs(previewRow.conversion_ms)}</div>
               <div>viewer load: {formatMs(viewerLoadMs)}</div>
               <div>triangles: {viewerTriangles ?? "-"}</div>

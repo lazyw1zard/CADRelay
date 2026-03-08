@@ -21,6 +21,7 @@ from app.services.storage_store import load_bytes, save_original_bytes
 router = APIRouter()
 # На MVP явно разрешаем только эти форматы.
 ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs"}
+ALLOWED_CONVERSION_PROFILES = {"fast", "balanced", "high"}
 
 
 def _resolve_user_fields(
@@ -40,6 +41,7 @@ def _resolve_user_fields(
 async def upload_model(
     model_id: str = Form(...),
     source_format: str = Form("step"),
+    conversion_profile: str = Form("balanced"),
     owner_user_id: str | None = Form(None),
     created_by_user_id: str | None = Form(None),
     auth_provider: str | None = Form(None),
@@ -50,6 +52,9 @@ async def upload_model(
     normalized_format = source_format.lower().strip()
     if normalized_format not in ALLOWED_SOURCE_FORMATS:
         raise HTTPException(status_code=400, detail="Unsupported source_format")
+    normalized_profile = conversion_profile.lower().strip()
+    if normalized_profile not in ALLOWED_CONVERSION_PROFILES:
+        raise HTTPException(status_code=400, detail="Unsupported conversion_profile")
 
     # Читаем файл в память и валидируем базовые ограничения.
     payload = await file.read()
@@ -82,6 +87,7 @@ async def upload_model(
             "id": model_version_id,
             "model_id": model_id,
             "source_format": normalized_format,
+            "conversion_profile": normalized_profile,
             "status": "uploaded",
             "owner_user_id": owner,
             "created_by_user_id": creator,
@@ -126,6 +132,7 @@ def create_model_version_endpoint(payload: ModelVersionCreate) -> ModelVersionRe
             "id": model_version_id,
             "model_id": payload.model_id,
             "source_format": payload.source_format,
+            "conversion_profile": payload.conversion_profile,
             "status": "uploaded",
             "owner_user_id": owner,
             "created_by_user_id": creator,

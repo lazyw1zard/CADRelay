@@ -20,7 +20,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.services.metadata_store import get_model_version, update_model_version  # noqa: E402
 from app.services.storage_store import load_bytes, save_glb_bytes  # noqa: E402
-from converter import convert_cad_file_to_glb_bytes  # noqa: E402
+from converter import SUPPORTED_PROFILES, convert_cad_file_to_glb_bytes  # noqa: E402
 
 
 SUPPORTED_EXTENSIONS = {
@@ -59,6 +59,12 @@ def _resolve_source_suffix(record: dict[str, Any], storage_key: str) -> str:
         return guessed
 
     return ".step"
+
+
+def _resolve_conversion_profile(record: dict[str, Any]) -> str:
+    # Профиль конвертации храним в записи модели; fallback на balanced.
+    raw = str(record.get("conversion_profile") or "balanced").lower().strip()
+    return raw if raw in SUPPORTED_PROFILES else "balanced"
 
 
 def _mark_pending_failed(
@@ -230,6 +236,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
 
             # 2) Во временной папке создаем входной файл с корректным расширением.
             suffix = _resolve_source_suffix(record, storage_key_original)
+            profile = _resolve_conversion_profile(record)
             with tempfile.TemporaryDirectory(prefix="cadrelay_worker_") as tmp_dir:
                 input_path = Path(tmp_dir) / f"source{suffix}"
                 input_path.write_bytes(source_bytes)
@@ -237,7 +244,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
                 # 3) Конвертируем CAD -> GLB.
                 # Замеряем только чистое время конвертации (без очереди и сетевых вызовов).
                 started_at = perf_counter()
-                glb_bytes = convert_cad_file_to_glb_bytes(input_path)
+                glb_bytes = convert_cad_file_to_glb_bytes(input_path, profile=profile)
                 conversion_ms = int((perf_counter() - started_at) * 1000)
 
             # 4) Сохраняем GLB и отмечаем запись как ready.
@@ -248,6 +255,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
                 status="ready",
                 storage_key_glb=glb_key,
                 conversion_ms=conversion_ms,
+                conversion_profile=profile,
                 updated_at=datetime.now(UTC).isoformat(),
             )
             if updated is None:
@@ -256,8 +264,12 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
             pending["status"] = "processed"
             pending["processed_at"] = datetime.now(UTC).isoformat()
             pending["conversion_ms"] = conversion_ms
+            pending["conversion_profile"] = profile
             _write_json(queue_file, queue)
-            print(f"conversion_ms model_version_id={model_version_id} value={conversion_ms}")
+            print(
+                f"conversion_ms model_version_id={model_version_id} "
+                f"profile={profile} value={conversion_ms}"
+            )
             return True, f"processed:{model_version_id}"
         except Exception as exc:  # noqa: BLE001
             _mark_pending_failed(
