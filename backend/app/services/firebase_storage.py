@@ -54,6 +54,12 @@ def load_bytes(storage_key: str) -> bytes:
     return blob.download_as_bytes()
 
 
+def delete_bytes(storage_key: str) -> None:
+    blob = _get_bucket().blob(storage_key)
+    if blob.exists():
+        blob.delete()
+
+
 def resolve_storage_path(storage_key: str) -> Path:
     # Для облачного backend нет локального пути; возвращаем key как псевдо-путь.
     return Path(storage_key)

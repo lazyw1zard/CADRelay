@@ -20,6 +20,12 @@ class Settings:
         self.metadata_file = self.data_dir / "metadata.json"
         self.queue_file = self.data_dir / "queue.json"
         self.max_upload_bytes = int(os.getenv("CADRELAY_MAX_UPLOAD_BYTES", 50 * 1024 * 1024))
+        self.auto_worker_enabled = os.getenv("CADRELAY_AUTO_WORKER_ENABLED", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         # local | firestore
         self.metadata_backend = os.getenv("CADRELAY_METADATA_BACKEND", "local").strip().lower()
         # local | firebase

@@ -75,6 +75,16 @@ def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any
     return current
 
 
+def delete_model_version(model_version_id: str) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    removed = data["model_versions"].pop(model_version_id, None)
+    if removed is None:
+        return None
+    data["approvals"] = [a for a in data["approvals"] if a.get("model_version_id") != model_version_id]
+    _write_json(settings.metadata_file, data)
+    return removed
+
+
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     # Добавляем запись о решении клиента в журнал approvals.
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})

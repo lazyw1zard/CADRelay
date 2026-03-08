@@ -59,5 +59,9 @@ def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any
     return _backend_module().update_model_version(model_version_id, **updates)
 
 
+def delete_model_version(model_version_id: str) -> dict[str, Any] | None:
+    return _backend_module().delete_model_version(model_version_id)
+
+
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     return _backend_module().add_approval(record)

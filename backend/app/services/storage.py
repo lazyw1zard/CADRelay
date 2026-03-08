@@ -38,6 +38,12 @@ def load_bytes(storage_key: str) -> bytes:
     return abs_path.read_bytes()
 
 
+def delete_bytes(storage_key: str) -> None:
+    abs_path = settings.storage_dir / storage_key
+    if abs_path.exists():
+        abs_path.unlink()
+
+
 def resolve_storage_path(storage_key: str) -> Path:
     # Переводим storage_key в физический путь на диске.
     return settings.storage_dir / storage_key

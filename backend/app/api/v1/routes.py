@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from app.core.config import settings
@@ -11,12 +11,14 @@ from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersio
 from app.services.metadata_store import (
     add_approval,
     create_model_version,
+    delete_model_version,
     get_model_version,
     list_model_versions,
     update_model_version,
 )
-from app.services.queue import enqueue_conversion
-from app.services.storage_store import load_bytes, save_original_bytes
+from app.services.queue import enqueue_conversion, remove_messages_for_model
+from app.services.storage_store import delete_bytes, load_bytes, save_original_bytes
+from app.services.worker_runner import run_worker_once_for_model
 
 router = APIRouter()
 # На MVP явно разрешаем только эти форматы.
@@ -39,6 +41,7 @@ def _resolve_user_fields(
 
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
+    background_tasks: BackgroundTasks,
     model_id: str = Form(...),
     source_format: str = Form("step"),
     conversion_profile: str = Form("balanced"),
@@ -111,6 +114,10 @@ async def upload_model(
     if record is None:
         raise HTTPException(status_code=500, detail="Failed to update model version")
 
+    # По умолчанию запускаем worker в фоне сразу после создания задачи.
+    if settings.auto_worker_enabled:
+        background_tasks.add_task(run_worker_once_for_model, record["id"])
+
     return UploadResponse(
         model_version=ModelVersionResponse(**record),
         queue_message_id=queue_message_id,
@@ -166,6 +173,30 @@ def get_model_version_endpoint(model_version_id: str) -> ModelVersionResponse:
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     return ModelVersionResponse(**record)
+
+
+@router.delete("/model-versions/{model_version_id}")
+def delete_model_version_endpoint(model_version_id: str) -> dict[str, str]:
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+
+    # Убираем сообщения из локальной очереди, чтобы worker не обрабатывал удаленную модель.
+    remove_messages_for_model(model_version_id)
+
+    for key in (record.get("storage_key_original"), record.get("storage_key_glb")):
+        if not key:
+            continue
+        try:
+            delete_bytes(key)
+        except Exception:
+            # Если файла уже нет - не блокируем удаление карточки модели.
+            pass
+
+    removed = delete_model_version(model_version_id)
+    if removed is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    return {"model_version_id": model_version_id, "status": "deleted"}
 
 
 @router.get("/model-versions/{model_version_id}/download")

@@ -41,3 +41,15 @@ def enqueue_conversion(model_version_id: str, storage_key_original: str) -> str:
     )
     _save_queue(queue)
     return message_id
+
+
+def remove_messages_for_model(model_version_id: str) -> int:
+    queue = _load_queue()
+    before = len(queue["messages"])
+    queue["messages"] = [
+        m for m in queue["messages"] if (m.get("payload") or {}).get("model_version_id") != model_version_id
+    ]
+    removed = before - len(queue["messages"])
+    if removed:
+        _save_queue(queue)
+    return removed

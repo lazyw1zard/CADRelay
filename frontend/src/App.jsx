@@ -63,6 +63,17 @@ async function apiApproval(modelVersionId, decision, comment, ownerUserId) {
   return resp.json();
 }
 
+async function apiDeleteModelVersion(modelVersionId) {
+  const resp = await fetch(`${API_BASE}/model-versions/${modelVersionId}`, {
+    method: "DELETE",
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`delete failed (${resp.status}): ${body}`);
+  }
+  return resp.json();
+}
+
 function formatMs(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return `${Math.round(Number(value))} ms`;
@@ -202,6 +213,33 @@ export function App() {
       // Сохраняем решение, затем перечитываем статус строки.
       await apiApproval(id, decision, comment, demoUserId);
       await refreshOne(id);
+    } catch (err) {
+      setError(String(err.message || err));
+    }
+  }
+
+  async function removeModelVersion(id) {
+    setError("");
+    try {
+      await apiDeleteModelVersion(id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      setThumbnailsById((prev) => {
+        if (!prev[id]) return prev;
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      setThumbnailFailedById((prev) => {
+        if (!prev[id]) return prev;
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      if (previewModelVersionId === id) {
+        setPreviewModelVersionId("");
+        setViewerLoadMs(null);
+        setViewerTriangles(null);
+      }
     } catch (err) {
       setError(String(err.message || err));
     }
@@ -352,6 +390,7 @@ export function App() {
                       <button type="button" onClick={() => refreshOne(r.id)}>Refresh</button>
                       <button type="button" onClick={() => approve(r.id, "approve")}>Approve</button>
                       <button type="button" onClick={() => approve(r.id, "reject")}>Reject</button>
+                      <button type="button" onClick={() => removeModelVersion(r.id)}>Delete</button>
                       <a href={`${API_BASE}/model-versions/${r.id}/download?kind=original`}>Download Original</a>
                       {r.storage_key_glb ? (
                         <>

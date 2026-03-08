@@ -64,6 +64,21 @@ def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any
     return updated.to_dict() if updated.exists else None
 
 
+def delete_model_version(model_version_id: str) -> dict[str, Any] | None:
+    client = _get_client()
+    ref = client.collection("model_versions").document(model_version_id)
+    doc = ref.get()
+    if not doc.exists:
+        return None
+    removed = doc.to_dict()
+    ref.delete()
+
+    approvals = client.collection("approvals").where("model_version_id", "==", model_version_id).stream()
+    for ap in approvals:
+        ap.reference.delete()
+    return removed
+
+
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     client = _get_client()
     client.collection("approvals").add(record)

@@ -19,6 +19,8 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ## Notes
 - Local MVP adapters write runtime data to `backend/data/`.
 - This data directory is ignored by git and will be replaced with Firestore + object storage adapters later.
+- By default backend auto-triggers one worker run after each upload.
+- To disable this behavior set `CADRELAY_AUTO_WORKER_ENABLED=false` in `backend/.env`.
 
 ## Firestore mode
 By default metadata backend is `local`.
@@ -28,7 +30,8 @@ Example `backend/.env`:
 
 ```env
 CADRELAY_METADATA_BACKEND=firestore
-CADRELAY_STORAGE_BACKEND=firebase
+CADRELAY_STORAGE_BACKEND=local
+CADRELAY_AUTO_WORKER_ENABLED=true
 FIREBASE_PROJECT_ID=cad-relay
 FIREBASE_STORAGE_BUCKET=<your-firebase-storage-bucket>
 GOOGLE_APPLICATION_CREDENTIALS=C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsvc-74a9ebbd37.json

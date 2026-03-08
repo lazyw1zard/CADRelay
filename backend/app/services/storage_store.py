@@ -43,3 +43,7 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
 
 def load_bytes(storage_key: str) -> bytes:
     return _backend_module().load_bytes(storage_key)
+
+
+def delete_bytes(storage_key: str) -> None:
+    return _backend_module().delete_bytes(storage_key)
