@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
+from app.core.auth import CurrentUser, get_current_user
 from app.core.config import settings
 from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
 from app.services.metadata_store import (
@@ -31,11 +32,19 @@ def _resolve_user_fields(
     created_by_user_id: str | None,
     auth_provider: str | None,
     auth_subject: str | None,
+    actor: CurrentUser,
 ) -> tuple[str, str, str, str]:
-    owner = owner_user_id or created_by_user_id or "demo_user"
+    if settings.auth_mode == "firebase":
+        owner = actor.user_id
+        creator = actor.user_id
+        provider = actor.auth_provider
+        subject = actor.auth_subject or actor.user_id
+        return owner, creator, provider, subject
+
+    owner = owner_user_id or created_by_user_id or actor.user_id
     creator = created_by_user_id or owner
-    provider = auth_provider or "dev"
-    subject = auth_subject or creator
+    provider = auth_provider or actor.auth_provider
+    subject = auth_subject or actor.auth_subject or creator
     return owner, creator, provider, subject
 
 
@@ -50,6 +59,7 @@ async def upload_model(
     auth_provider: str | None = Form(None),
     auth_subject: str | None = Form(None),
     file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> UploadResponse:
     # Нормализуем и проверяем формат, чтобы не тащить неподдерживаемые файлы дальше.
     normalized_format = source_format.lower().strip()
@@ -73,6 +83,7 @@ async def upload_model(
         created_by_user_id=created_by_user_id,
         auth_provider=auth_provider,
         auth_subject=auth_subject,
+        actor=current_user,
     )
     try:
         storage_key_original, checksum, size_bytes = save_original_bytes(
@@ -125,7 +136,10 @@ async def upload_model(
 
 
 @router.post("/model-versions", response_model=ModelVersionResponse)
-def create_model_version_endpoint(payload: ModelVersionCreate) -> ModelVersionResponse:
+def create_model_version_endpoint(
+    payload: ModelVersionCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelVersionResponse:
     # Служебный endpoint: создает запись версии без загрузки файла.
     model_version_id = f"mv_{uuid4().hex[:12]}"
     owner, creator, provider, subject = _resolve_user_fields(
@@ -133,6 +147,7 @@ def create_model_version_endpoint(payload: ModelVersionCreate) -> ModelVersionRe
         created_by_user_id=payload.created_by_user_id,
         auth_provider=payload.auth_provider,
         auth_subject=payload.auth_subject,
+        actor=current_user,
     )
     record = create_model_version(
         {
@@ -161,25 +176,47 @@ def list_model_versions_endpoint(
     owner_user_id: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> list[ModelVersionResponse]:
-    rows = list_model_versions(owner_user_id=owner_user_id, status=status, limit=limit)
+    # В auth-режиме по умолчанию показываем только свои модели.
+    if settings.auth_mode == "firebase" and not current_user.is_admin:
+        owner_filter = current_user.user_id
+    else:
+        owner_filter = owner_user_id
+    rows = list_model_versions(owner_user_id=owner_filter, status=status, limit=limit)
     return [ModelVersionResponse(**row) for row in rows]
 
 
+def _ensure_can_access(record: dict, current_user: CurrentUser) -> None:
+    owner = record.get("owner_user_id")
+    if current_user.is_admin:
+        return
+    if owner and owner != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/model-versions/{model_version_id}", response_model=ModelVersionResponse)
-def get_model_version_endpoint(model_version_id: str) -> ModelVersionResponse:
+def get_model_version_endpoint(
+    model_version_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelVersionResponse:
     # Endpoint для polling: фронт проверяет текущий статус обработки.
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
     return ModelVersionResponse(**record)
 
 
 @router.delete("/model-versions/{model_version_id}")
-def delete_model_version_endpoint(model_version_id: str) -> dict[str, str]:
+def delete_model_version_endpoint(
+    model_version_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, str]:
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
 
     # Убираем сообщения из локальной очереди, чтобы worker не обрабатывал удаленную модель.
     remove_messages_for_model(model_version_id)
@@ -203,10 +240,12 @@ def delete_model_version_endpoint(model_version_id: str) -> dict[str, str]:
 def download_model_version_file(
     model_version_id: str,
     kind: str = Query(pattern="^(original|glb)$"),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
 
     storage_key = record.get("storage_key_original") if kind == "original" else record.get("storage_key_glb")
     if not storage_key:
@@ -226,18 +265,23 @@ def download_model_version_file(
 
 
 @router.post("/model-versions/{model_version_id}/approval")
-def approve_model_version(model_version_id: str, payload: ApprovalDecision) -> dict[str, str]:
+def approve_model_version(
+    model_version_id: str,
+    payload: ApprovalDecision,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, str]:
     # Сохраняем решение клиента по версии модели (approve/reject).
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
 
     approval_record = add_approval(
         {
             "model_version_id": model_version_id,
             "decision": payload.decision,
             "comment": payload.comment,
-            "created_by_user_id": payload.created_by_user_id or record.get("created_by_user_id"),
+            "created_by_user_id": payload.created_by_user_id or current_user.user_id,
             "created_at": datetime.now(UTC).isoformat(),
         }
     )

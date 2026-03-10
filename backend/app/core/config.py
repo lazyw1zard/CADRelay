@@ -33,6 +33,9 @@ class Settings:
         self.firebase_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
         self.firebase_storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
         self.google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+        # disabled | firebase
+        self.auth_mode = os.getenv("CADRELAY_AUTH_MODE", "disabled").strip().lower()
+        self.firebase_auth_credentials = os.getenv("FIREBASE_AUTH_CREDENTIALS", "").strip()
 
 
 settings = Settings()

@@ -1,76 +1,82 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { generateGlbThumbnail } from "./lib/thumbnail";
+import {
+  getCurrentIdToken,
+  getFirebaseConfigStatus,
+  signInEmailPassword,
+  signOutCurrentUser,
+  watchAuthState,
+} from "./lib/firebaseAuth";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 // Компонент 3D-viewer грузим только когда он реально нужен (lazy-loading).
 const GlbViewer = lazy(() => import("./components/GlbViewer").then((m) => ({ default: m.GlbViewer })));
 
+function withAuthToken(url, token) {
+  if (!token) return url;
+  const qs = new URLSearchParams();
+  qs.set("access_token", token);
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}${qs.toString()}`;
+}
+
+async function apiFetch(path, { token = "", method = "GET", headers = {}, body, cache = "no-store" } = {}) {
+  const finalHeaders = new Headers(headers);
+  if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
+  const resp = await fetch(`${API_BASE}${path}`, { method, headers: finalHeaders, body, cache });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${method} ${path} failed (${resp.status}): ${text}`);
+  }
+  return resp;
+}
+
 // Получить актуальное состояние конкретной версии модели.
-async function apiGetModelVersion(id) {
-  const resp = await fetch(`${API_BASE}/model-versions/${id}?ts=${Date.now()}`, {
-    cache: "no-store",
-  });
-  if (!resp.ok) throw new Error(`status ${resp.status}`);
+async function apiGetModelVersion(id, token) {
+  const resp = await apiFetch(`/model-versions/${id}?ts=${Date.now()}`, { token });
   return resp.json();
 }
 
 // Получить список версий моделей (с фильтрацией по owner_user_id).
-async function apiListModelVersions({ ownerUserId }) {
+async function apiListModelVersions({ ownerUserId, token }) {
   const qs = new URLSearchParams();
   if (ownerUserId) qs.set("owner_user_id", ownerUserId);
   qs.set("limit", "100");
-  const resp = await fetch(`${API_BASE}/model-versions?${qs.toString()}`, {
-    cache: "no-store",
-  });
-  if (!resp.ok) throw new Error(`list failed (${resp.status})`);
+  const resp = await apiFetch(`/model-versions?${qs.toString()}`, { token });
   return resp.json();
 }
 
 // Загрузка файла модели в backend через multipart/form-data.
-async function apiUpload({ modelId, sourceFormat, conversionProfile, file, ownerUserId }) {
+async function apiUpload({ modelId, sourceFormat, conversionProfile, file, ownerUserId, token }) {
   const form = new FormData();
   form.append("model_id", modelId);
   form.append("source_format", sourceFormat);
   form.append("conversion_profile", conversionProfile);
-  form.append("owner_user_id", ownerUserId);
-  form.append("created_by_user_id", ownerUserId);
-  form.append("auth_provider", "dev");
-  form.append("auth_subject", ownerUserId);
+  if (ownerUserId) {
+    form.append("owner_user_id", ownerUserId);
+    form.append("created_by_user_id", ownerUserId);
+    form.append("auth_provider", "dev");
+    form.append("auth_subject", ownerUserId);
+  }
   form.append("file", file);
 
-  const resp = await fetch(`${API_BASE}/uploads`, {
-    method: "POST",
-    body: form,
-  });
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`upload failed (${resp.status}): ${body}`);
-  }
+  const resp = await apiFetch("/uploads", { token, method: "POST", body: form });
   return resp.json();
 }
 
 // Отправить решение клиента по модели (approve/reject + комментарий).
-async function apiApproval(modelVersionId, decision, comment, ownerUserId) {
-  const resp = await fetch(`${API_BASE}/model-versions/${modelVersionId}/approval`, {
+async function apiApproval(modelVersionId, decision, comment, ownerUserId, token) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}/approval`, {
+    token,
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ decision, comment: comment || null, created_by_user_id: ownerUserId }),
+    body: JSON.stringify({ decision, comment: comment || null, created_by_user_id: ownerUserId || null }),
   });
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`approval failed (${resp.status}): ${body}`);
-  }
   return resp.json();
 }
 
-async function apiDeleteModelVersion(modelVersionId) {
-  const resp = await fetch(`${API_BASE}/model-versions/${modelVersionId}`, {
-    method: "DELETE",
-  });
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`delete failed (${resp.status}): ${body}`);
-  }
+async function apiDeleteModelVersion(modelVersionId, token) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
   return resp.json();
 }
 
@@ -80,6 +86,12 @@ function formatMs(value) {
 }
 
 export function App() {
+  const firebaseReady = getFirebaseConfigStatus();
+  const [authUser, setAuthUser] = useState(null);
+  const [idToken, setIdToken] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const [demoUserId, setDemoUserId] = useState("demo_user_001");
   const [modelId, setModelId] = useState("model_demo_ui");
   const [sourceFormat, setSourceFormat] = useState("step");
@@ -110,6 +122,24 @@ export function App() {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    if (!firebaseReady) return undefined;
+    const stop = watchAuthState(async (user) => {
+      setAuthUser(user || null);
+      if (!user) {
+        setIdToken("");
+        return;
+      }
+      try {
+        const token = await getCurrentIdToken();
+        setIdToken(token || "");
+      } catch {
+        setIdToken("");
+      }
+    });
+    return stop;
+  }, [firebaseReady]);
+
+  useEffect(() => {
     // В dev StrictMode React делает mount->unmount->mount,
     // поэтому при каждом входе в эффект выставляем true заново.
     isMountedRef.current = true;
@@ -124,7 +154,7 @@ export function App() {
     async function loadInitialRows() {
       setError("");
       try {
-        const list = await apiListModelVersions({ ownerUserId: demoUserId });
+        const list = await apiListModelVersions({ ownerUserId: demoUserId, token: idToken });
         if (!cancelled) {
           setRows(list);
           // По умолчанию выбираем самую свежую модель со статусом ready.
@@ -140,7 +170,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [demoUserId]);
+  }, [demoUserId, idToken]);
 
   useEffect(() => {
     // Автопуллинг только для строк в processing.
@@ -149,7 +179,7 @@ export function App() {
       if (processingIds.length === 0) return;
 
       try {
-        const updates = await Promise.all(processingIds.map((id) => apiGetModelVersion(id)));
+        const updates = await Promise.all(processingIds.map((id) => apiGetModelVersion(id, idToken)));
         setRows((prev) => {
           const byId = new Map(updates.map((u) => [u.id, u]));
           return prev.map((r) => byId.get(r.id) || r);
@@ -160,7 +190,41 @@ export function App() {
     }, 2000);
 
     return () => clearInterval(timer);
-  }, [rows]);
+  }, [rows, idToken]);
+
+  async function handleSignIn(e) {
+    e.preventDefault();
+    setError("");
+    if (!firebaseReady) {
+      setError("Firebase config не настроен в frontend/.env.local");
+      return;
+    }
+    setAuthBusy(true);
+    try {
+      await signInEmailPassword(loginEmail.trim(), loginPassword);
+      const token = await getCurrentIdToken();
+      setIdToken(token || "");
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setError("");
+    setAuthBusy(true);
+    try {
+      await signOutCurrentUser();
+      setIdToken("");
+      setRows([]);
+      setPreviewModelVersionId("");
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
 
   async function handleUpload(e) {
     e.preventDefault();
@@ -179,6 +243,7 @@ export function App() {
         conversionProfile,
         file,
         ownerUserId: demoUserId,
+        token: idToken,
       });
       const row = data.model_version;
       setRows((prev) => [row, ...prev]);
@@ -200,7 +265,7 @@ export function App() {
     setError("");
     try {
       // Ручной polling статуса для одной версии.
-      const updated = await apiGetModelVersion(id);
+      const updated = await apiGetModelVersion(id, idToken);
       setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
     } catch (err) {
       setError(String(err.message || err));
@@ -211,7 +276,7 @@ export function App() {
     setError("");
     try {
       // Сохраняем решение, затем перечитываем статус строки.
-      await apiApproval(id, decision, comment, demoUserId);
+      await apiApproval(id, decision, comment, demoUserId, idToken);
       await refreshOne(id);
     } catch (err) {
       setError(String(err.message || err));
@@ -221,7 +286,7 @@ export function App() {
   async function removeModelVersion(id) {
     setError("");
     try {
-      await apiDeleteModelVersion(id);
+      await apiDeleteModelVersion(id, idToken);
       setRows((prev) => prev.filter((r) => r.id !== id));
       setThumbnailsById((prev) => {
         if (!prev[id]) return prev;
@@ -254,7 +319,7 @@ export function App() {
   const previewRow = useMemo(() => rows.find((r) => r.id === previewModelVersionId) || null, [rows, previewModelVersionId]);
 
   const previewUrl = previewRow?.storage_key_glb
-    ? `${API_BASE}/model-versions/${previewRow.id}/download?kind=glb`
+    ? withAuthToken(`${API_BASE}/model-versions/${previewRow.id}/download?kind=glb`, idToken)
     : "";
 
   const handleViewerLoadMetrics = useCallback(({ loadMs, triangles }) => {
@@ -277,7 +342,7 @@ export function App() {
     if (!next) return;
 
     setThumbnailInProgressId(next.id);
-    const url = `${API_BASE}/model-versions/${next.id}/download?kind=glb`;
+    const url = withAuthToken(`${API_BASE}/model-versions/${next.id}/download?kind=glb`, idToken);
 
     generateGlbThumbnail(url)
       .then((png) => {
@@ -292,7 +357,7 @@ export function App() {
       .finally(() => {
         if (isMountedRef.current) setThumbnailInProgressId("");
       });
-  }, [rows, thumbnailsById, thumbnailInProgressId, thumbnailFailedById]);
+  }, [rows, thumbnailsById, thumbnailInProgressId, thumbnailFailedById, idToken]);
 
   function handleOpenPreview(row) {
     setPreviewModelVersionId(row.id);
@@ -305,6 +370,36 @@ export function App() {
     <main className="page">
       <h1>CADRelay MVP</h1>
       <p className="muted">Upload - processing - ready</p>
+      <section className="card">
+        <div className="row">
+          <h2>Auth</h2>
+          {authUser ? <span className="badge">uid: {authUser.uid}</span> : <span className="badge">not signed in</span>}
+        </div>
+        {!firebaseReady ? (
+          <p className="muted">Firebase config не найден. Добавь VITE_FIREBASE_* в frontend/.env.local.</p>
+        ) : authUser ? (
+          <div className="actions">
+            <p className="muted">{authUser.email || authUser.uid}</p>
+            <button type="button" onClick={handleSignOut} disabled={authBusy}>
+              {authBusy ? "Выход..." : "Sign out"}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSignIn}>
+            <label>
+              Email
+              <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+            </label>
+            <label>
+              Password
+              <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+            </label>
+            <button type="submit" disabled={authBusy}>
+              {authBusy ? "Вход..." : "Sign in"}
+            </button>
+          </form>
+        )}
+      </section>
 
       <form className="card" onSubmit={handleUpload}>
         <label>
@@ -391,10 +486,14 @@ export function App() {
                       <button type="button" onClick={() => approve(r.id, "approve")}>Approve</button>
                       <button type="button" onClick={() => approve(r.id, "reject")}>Reject</button>
                       <button type="button" onClick={() => removeModelVersion(r.id)}>Delete</button>
-                      <a href={`${API_BASE}/model-versions/${r.id}/download?kind=original`}>Download Original</a>
+                      <a href={withAuthToken(`${API_BASE}/model-versions/${r.id}/download?kind=original`, idToken)}>
+                        Download Original
+                      </a>
                       {r.storage_key_glb ? (
                         <>
-                          <a href={`${API_BASE}/model-versions/${r.id}/download?kind=glb`}>Download GLB</a>
+                          <a href={withAuthToken(`${API_BASE}/model-versions/${r.id}/download?kind=glb`, idToken)}>
+                            Download GLB
+                          </a>
                           <button type="button" onClick={() => handleOpenPreview(r)}>Preview</button>
                         </>
                       ) : null}

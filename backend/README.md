@@ -42,3 +42,18 @@ Then run server normally:
 ```powershell
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+## Auth mode (MVP)
+By default auth is disabled (`CADRELAY_AUTH_MODE=disabled`) to keep local flow simple.
+
+To enable Firebase token verification:
+
+```env
+CADRELAY_AUTH_MODE=firebase
+FIREBASE_AUTH_CREDENTIALS=C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsvc-74a9ebbd37.json
+```
+
+Notes:
+- API expects `Authorization: Bearer <firebase_id_token>` when firebase auth mode is enabled.
+- `owner_user_id` for uploaded models is taken from token `uid` in firebase mode.
+- Non-admin user can access only own model versions; `admin` role can be set via Firebase custom claims.
