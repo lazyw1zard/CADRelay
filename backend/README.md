@@ -56,4 +56,25 @@ FIREBASE_AUTH_CREDENTIALS=C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsv
 Notes:
 - API expects `Authorization: Bearer <firebase_id_token>` when firebase auth mode is enabled.
 - `owner_user_id` for uploaded models is taken from token `uid` in firebase mode.
-- Non-admin user can access only own model versions; `admin` role can be set via Firebase custom claims.
+- Non-admin user can access only own model versions.
+
+## Role policy (MVP)
+Roles are read from Firebase custom claims (`role`).
+If claim is missing, backend defaults role to `editor` for MVP speed.
+
+Allowed roles:
+- `viewer`: list/get/download own model versions.
+- `editor`: viewer + upload/create/delete own model versions.
+- `reviewer`: viewer + approve/reject own model versions.
+- `admin`: full access to all model versions.
+
+### Set role in Firebase custom claims
+Use backend utility script:
+
+```powershell
+cd C:\Projects\CADRelay\backend
+.\.venv\Scripts\Activate.ps1
+python .\scripts\set_firebase_role.py --uid <FIREBASE_UID> --role editor --credentials C:/Projects/conf_path/cad-relay-firebase-adminsdk-fbsvc-74a9ebbd37.json
+```
+
+After changing claims, user should sign out/sign in to refresh token.

@@ -10,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.config import settings
 
 security = HTTPBearer(auto_error=False)
+ALLOWED_ROLES = {"viewer", "editor", "reviewer", "admin"}
 
 
 @dataclass(frozen=True)
@@ -62,18 +63,20 @@ def _init_firebase_if_needed() -> None:
 
 def _parse_role(claims: dict[str, Any]) -> str:
     role = claims.get("role")
-    if isinstance(role, str) and role:
+    if isinstance(role, str) and role in ALLOWED_ROLES:
         return role
     roles = claims.get("roles")
     if isinstance(roles, list):
         for item in roles:
-            if isinstance(item, str) and item:
+            if isinstance(item, str) and item in ALLOWED_ROLES:
                 if item == "admin":
                     return "admin"
         for item in roles:
-            if isinstance(item, str) and item:
+            if isinstance(item, str) and item in ALLOWED_ROLES:
                 return item
-    return "viewer"
+    # Для MVP новый пользователь без claims получает editor,
+    # чтобы сразу можно было загружать и удалять свои модели.
+    return "editor"
 
 
 def get_current_user(

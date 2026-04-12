@@ -25,6 +25,14 @@ router = APIRouter()
 # На MVP явно разрешаем только эти форматы.
 ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs"}
 ALLOWED_CONVERSION_PROFILES = {"fast", "balanced", "high"}
+ROLE_VIEW = {"viewer", "editor", "reviewer", "admin"}
+ROLE_EDIT = {"editor", "admin"}
+ROLE_REVIEW = {"editor", "reviewer", "admin"}
+
+
+def _ensure_role(current_user: CurrentUser, allowed: set[str]) -> None:
+    if current_user.role not in allowed:
+        raise HTTPException(status_code=403, detail=f"Role '{current_user.role}' is not allowed")
 
 
 def _resolve_user_fields(
@@ -61,6 +69,7 @@ async def upload_model(
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> UploadResponse:
+    _ensure_role(current_user, ROLE_EDIT)
     # Нормализуем и проверяем формат, чтобы не тащить неподдерживаемые файлы дальше.
     normalized_format = source_format.lower().strip()
     if normalized_format not in ALLOWED_SOURCE_FORMATS:
@@ -140,6 +149,7 @@ def create_model_version_endpoint(
     payload: ModelVersionCreate,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ModelVersionResponse:
+    _ensure_role(current_user, ROLE_EDIT)
     # Служебный endpoint: создает запись версии без загрузки файла.
     model_version_id = f"mv_{uuid4().hex[:12]}"
     owner, creator, provider, subject = _resolve_user_fields(
@@ -178,6 +188,7 @@ def list_model_versions_endpoint(
     limit: int = 50,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> list[ModelVersionResponse]:
+    _ensure_role(current_user, ROLE_VIEW)
     # В auth-режиме по умолчанию показываем только свои модели.
     if settings.auth_mode == "firebase" and not current_user.is_admin:
         owner_filter = current_user.user_id
@@ -200,6 +211,7 @@ def get_model_version_endpoint(
     model_version_id: str,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ModelVersionResponse:
+    _ensure_role(current_user, ROLE_VIEW)
     # Endpoint для polling: фронт проверяет текущий статус обработки.
     record = get_model_version(model_version_id)
     if record is None:
@@ -213,6 +225,7 @@ def delete_model_version_endpoint(
     model_version_id: str,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, str]:
+    _ensure_role(current_user, ROLE_EDIT)
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
@@ -242,6 +255,7 @@ def download_model_version_file(
     kind: str = Query(pattern="^(original|glb)$"),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
+    _ensure_role(current_user, ROLE_VIEW)
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
@@ -270,6 +284,7 @@ def approve_model_version(
     payload: ApprovalDecision,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, str]:
+    _ensure_role(current_user, ROLE_REVIEW)
     # Сохраняем решение клиента по версии модели (approve/reject).
     record = get_model_version(model_version_id)
     if record is None:
