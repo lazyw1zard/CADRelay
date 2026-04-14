@@ -4,6 +4,7 @@ import {
   getCurrentIdToken,
   getFirebaseConfigStatus,
   signInEmailPassword,
+  signUpEmailPassword,
   signOutCurrentUser,
   watchAuthState,
 } from "./lib/firebaseAuth";
@@ -89,8 +90,10 @@ export function App() {
   const firebaseReady = getFirebaseConfigStatus();
   const [authUser, setAuthUser] = useState(null);
   const [idToken, setIdToken] = useState("");
+  const [authMode, setAuthMode] = useState("signin");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [demoUserId, setDemoUserId] = useState("demo_user_001");
   const [modelId, setModelId] = useState("model_demo_ui");
@@ -125,6 +128,8 @@ export function App() {
     if (!firebaseReady) return undefined;
     const stop = watchAuthState(async (user) => {
       setAuthUser(user || null);
+      // Для наглядности синхронизируем поле owner с uid текущего пользователя.
+      setDemoUserId(user?.uid || "demo_user_001");
       if (!user) {
         setIdToken("");
         return;
@@ -152,6 +157,11 @@ export function App() {
     let cancelled = false;
 
     async function loadInitialRows() {
+      // В auth-режиме до входа не дергаем API, чтобы не получать лишний 401 в UI.
+      if (firebaseReady && !idToken) {
+        if (!cancelled) setRows([]);
+        return;
+      }
       setError("");
       try {
         const list = await apiListModelVersions({ ownerUserId: demoUserId, token: idToken });
@@ -173,6 +183,7 @@ export function App() {
   }, [demoUserId, idToken]);
 
   useEffect(() => {
+    if (firebaseReady && !idToken) return undefined;
     // Автопуллинг только для строк в processing.
     const timer = setInterval(async () => {
       const processingIds = rows.filter((r) => r.status === "processing").map((r) => r.id);
@@ -190,20 +201,39 @@ export function App() {
     }, 2000);
 
     return () => clearInterval(timer);
-  }, [rows, idToken]);
+  }, [rows, idToken, firebaseReady]);
 
-  async function handleSignIn(e) {
+  async function handleAuthSubmit(e) {
     e.preventDefault();
     setError("");
     if (!firebaseReady) {
       setError("Firebase config не настроен в frontend/.env.local");
       return;
     }
+    const email = loginEmail.trim();
+    if (!email) {
+      setError("Укажи email");
+      return;
+    }
+    if (loginPassword.length < 6) {
+      setError("Пароль должен быть не короче 6 символов");
+      return;
+    }
+    if (authMode === "signup" && loginPassword !== confirmPassword) {
+      setError("Пароли не совпадают");
+      return;
+    }
+
     setAuthBusy(true);
     try {
-      await signInEmailPassword(loginEmail.trim(), loginPassword);
+      if (authMode === "signup") {
+        await signUpEmailPassword(email, loginPassword);
+      } else {
+        await signInEmailPassword(email, loginPassword);
+      }
       const token = await getCurrentIdToken();
       setIdToken(token || "");
+      setConfirmPassword("");
     } catch (err) {
       setError(String(err.message || err));
     } finally {
@@ -385,7 +415,23 @@ export function App() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSignIn}>
+          <form onSubmit={handleAuthSubmit}>
+            <div className="auth-mode">
+              <button
+                type="button"
+                className={authMode === "signin" ? "auth-mode-active" : "auth-mode-idle"}
+                onClick={() => setAuthMode("signin")}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={authMode === "signup" ? "auth-mode-active" : "auth-mode-idle"}
+                onClick={() => setAuthMode("signup")}
+              >
+                Sign up
+              </button>
+            </div>
             <label>
               Email
               <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
@@ -394,8 +440,18 @@ export function App() {
               Password
               <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
             </label>
+            {authMode === "signup" ? (
+              <label>
+                Confirm password
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </label>
+            ) : null}
             <button type="submit" disabled={authBusy}>
-              {authBusy ? "Вход..." : "Sign in"}
+              {authBusy ? "Обработка..." : authMode === "signup" ? "Create account" : "Sign in"}
             </button>
           </form>
         )}

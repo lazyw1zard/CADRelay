@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -40,6 +40,11 @@ export function watchAuthState(callback) {
 export async function signInEmailPassword(email, password) {
   const auth = getFirebaseAuth();
   return signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function signUpEmailPassword(email, password) {
+  const auth = getFirebaseAuth();
+  return createUserWithEmailAndPassword(auth, email, password);
 }
 
 export async function signOutCurrentUser() {

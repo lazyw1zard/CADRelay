@@ -107,6 +107,23 @@ td {
   font-size: 13px;
 }
 
+.auth-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.auth-mode button.auth-mode-idle {
+  background: #dbe7ff;
+  color: #1345a5;
+}
+
+.auth-mode button.auth-mode-active {
+  background: #0f6adf;
+  color: #fff;
+}
+
 .error {
   color: #b00020;
   font-weight: 600;
