@@ -739,6 +739,8 @@ export function App() {
             <option value="stp">stp</option>
             <option value="iges">iges</option>
             <option value="igs">igs</option>
+            <option value="3mf">3mf</option>
+            <option value="stl">stl</option>
           </select>
         </label>
 

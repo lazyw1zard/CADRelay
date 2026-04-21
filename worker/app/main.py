@@ -28,6 +28,8 @@ SUPPORTED_EXTENSIONS = {
     "stp": ".stp",
     "iges": ".iges",
     "igs": ".igs",
+    "3mf": ".3mf",
+    "stl": ".stl",
 }
 
 

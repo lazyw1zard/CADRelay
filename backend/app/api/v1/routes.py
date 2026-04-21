@@ -31,8 +31,8 @@ from app.services.storage_store import delete_bytes, load_bytes, save_original_b
 from app.services.worker_runner import run_worker_once_for_model
 
 router = APIRouter()
-# На MVP явно разрешаем только эти форматы.
-ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs"}
+# На MVP поддерживаем CAD + mesh-форматы для 3D-печати.
+ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs", "3mf", "stl"}
 ALLOWED_CONVERSION_PROFILES = {"fast", "balanced", "high"}
 ROLE_VIEW = {"viewer", "editor", "reviewer", "admin"}
 ROLE_EDIT = {"editor", "admin"}
