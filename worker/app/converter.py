@@ -3,13 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 
-import gmsh
 import trimesh
 
 SUPPORTED_PROFILES = {"fast", "balanced", "high"}
 
 
-def _apply_profile(profile: str) -> str:
+def _get_gmsh():
+    # Импортируем gmsh только когда реально нужна CAD-ветка (STEP/IGES).
+    try:
+        import gmsh  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError("CAD conversion requires 'gmsh' package and native libs") from exc
+    return gmsh
+
+
+def _apply_profile(profile: str, gmsh_mod) -> str:
     # Профили качества влияют на плотность сетки:
     # fast -> меньше треугольников и быстрее,
     # balanced -> базовый компромисс,
@@ -19,11 +27,11 @@ def _apply_profile(profile: str) -> str:
         normalized = "balanced"
 
     if normalized == "fast":
-        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 2.0)
+        gmsh_mod.option.setNumber("Mesh.CharacteristicLengthFactor", 2.0)
     elif normalized == "high":
-        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 0.6)
+        gmsh_mod.option.setNumber("Mesh.CharacteristicLengthFactor", 0.6)
     else:
-        gmsh.option.setNumber("Mesh.CharacteristicLengthFactor", 1.0)
+        gmsh_mod.option.setNumber("Mesh.CharacteristicLengthFactor", 1.0)
     return normalized
 
 
@@ -89,18 +97,19 @@ def convert_cad_file_to_glb_bytes(input_path: Path, profile: str = "balanced") -
     with tempfile.TemporaryDirectory(prefix="cadrelay_convert_") as tmp_dir:
         tmp = Path(tmp_dir)
         stl_path = tmp / "mesh.stl"
+        gmsh_mod = _get_gmsh()
 
-        gmsh.initialize()
+        gmsh_mod.initialize()
         try:
-            gmsh.option.setNumber("General.Terminal", 0)
-            _apply_profile(profile)
-            gmsh.model.add("cadrelay")
-            gmsh.model.occ.importShapes(str(input_path))
-            gmsh.model.occ.synchronize()
-            gmsh.model.mesh.generate(2)
-            gmsh.write(str(stl_path))
+            gmsh_mod.option.setNumber("General.Terminal", 0)
+            _apply_profile(profile, gmsh_mod)
+            gmsh_mod.model.add("cadrelay")
+            gmsh_mod.model.occ.importShapes(str(input_path))
+            gmsh_mod.model.occ.synchronize()
+            gmsh_mod.model.mesh.generate(2)
+            gmsh_mod.write(str(stl_path))
         finally:
-            gmsh.finalize()
+            gmsh_mod.finalize()
 
         # STL после gmsh читаем напрямую как mesh (так стабильнее для старого пути).
         mesh = trimesh.load(stl_path, force="mesh")
