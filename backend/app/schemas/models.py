@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -40,3 +42,25 @@ class ApprovalDecision(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     comment: str | None = None
     created_by_user_id: str | None = None
+
+
+class AdminRoleUpdateRequest(BaseModel):
+    # Новая роль пользователя, которую задает администратор.
+    role: Literal["viewer", "editor", "reviewer", "admin"]
+
+
+class AdminUserResponse(BaseModel):
+    # UID из Firebase Auth.
+    uid: str
+    email: str | None = None
+    display_name: str | None = None
+    disabled: bool = False
+    email_verified: bool = False
+    role: Literal["viewer", "editor", "reviewer", "admin"]
+
+
+class AdminUserListResponse(BaseModel):
+    # Страница пользователей для админского интерфейса.
+    users: list[AdminUserResponse]
+    # Токен следующей страницы (если пользователей много).
+    next_page_token: str | None = None

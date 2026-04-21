@@ -8,7 +8,16 @@ from fastapi.responses import Response
 
 from app.core.auth import CurrentUser, get_current_user
 from app.core.config import settings
-from app.schemas.models import ApprovalDecision, ModelVersionCreate, ModelVersionResponse, UploadResponse
+from app.schemas.models import (
+    AdminRoleUpdateRequest,
+    AdminUserListResponse,
+    AdminUserResponse,
+    ApprovalDecision,
+    ModelVersionCreate,
+    ModelVersionResponse,
+    UploadResponse,
+)
+from app.services.firebase_auth_admin import list_auth_users, set_auth_user_role
 from app.services.metadata_store import (
     add_approval,
     create_model_version,
@@ -28,9 +37,11 @@ ALLOWED_CONVERSION_PROFILES = {"fast", "balanced", "high"}
 ROLE_VIEW = {"viewer", "editor", "reviewer", "admin"}
 ROLE_EDIT = {"editor", "admin"}
 ROLE_REVIEW = {"editor", "reviewer", "admin"}
+ROLE_ADMIN = {"admin"}
 
 
 def _ensure_role(current_user: CurrentUser, allowed: set[str]) -> None:
+    # Единая проверка доступа по роли.
     if current_user.role not in allowed:
         raise HTTPException(status_code=403, detail=f"Role '{current_user.role}' is not allowed")
 
@@ -304,3 +315,38 @@ def approve_model_version(
         "model_version_id": approval_record["model_version_id"],
         "decision": approval_record["decision"],
     }
+
+
+@router.get("/admin/users", response_model=AdminUserListResponse)
+def admin_list_users(
+    limit: int = Query(default=50, ge=1, le=200),
+    page_token: str | None = None,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AdminUserListResponse:
+    # Админ читает список пользователей из Firebase Auth.
+    _ensure_role(current_user, ROLE_ADMIN)
+    try:
+        result = list_auth_users(limit=limit, page_token=page_token)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    users = [AdminUserResponse(**row) for row in result.get("users", [])]
+    return AdminUserListResponse(users=users, next_page_token=result.get("next_page_token"))
+
+
+@router.post("/admin/users/{uid}/role", response_model=AdminUserResponse)
+def admin_set_user_role(
+    uid: str,
+    payload: AdminRoleUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AdminUserResponse:
+    # Админ назначает роль через Firebase custom claims.
+    _ensure_role(current_user, ROLE_ADMIN)
+    try:
+        row = set_auth_user_role(uid=uid, role=payload.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AdminUserResponse(**row)

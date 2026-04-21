@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-import firebase_admin
-from firebase_admin import auth, credentials
-
-ALLOWED_ROLES = {"viewer", "editor", "reviewer", "admin"}
+from app.services.firebase_auth_admin import ALLOWED_ROLES, set_auth_user_role
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,19 +18,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    # CLI-обертка для назначения роли из терминала.
     args = parse_args()
-    cred_path = Path(args.credentials)
-    if not cred_path.exists():
-        raise SystemExit(f"Credentials file not found: {cred_path}")
-
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(credentials.Certificate(str(cred_path)))
-
-    user = auth.get_user(args.uid)
-    claims = dict(user.custom_claims or {})
-    claims["role"] = args.role
-    auth.set_custom_user_claims(args.uid, claims)
-    print(f"Updated role for uid={args.uid}: role={args.role}")
+    row = set_auth_user_role(uid=args.uid, role=args.role, credentials_path=args.credentials)
+    print(f"Updated role for uid={row['uid']}: role={row['role']}")
     return 0
 
 

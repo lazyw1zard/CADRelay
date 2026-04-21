@@ -57,3 +57,9 @@ export async function getCurrentIdToken() {
   if (!auth.currentUser) return "";
   return auth.currentUser.getIdToken();
 }
+
+export async function getCurrentIdTokenResult() {
+  const auth = getFirebaseAuth();
+  if (!auth.currentUser) return null;
+  return auth.currentUser.getIdTokenResult();
+}

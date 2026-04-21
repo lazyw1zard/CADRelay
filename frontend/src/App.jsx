@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { generateGlbThumbnail } from "./lib/thumbnail";
 import {
   getCurrentIdToken,
+  getCurrentIdTokenResult,
   getFirebaseConfigStatus,
   signInEmailPassword,
   signUpEmailPassword,
@@ -81,6 +82,26 @@ async function apiDeleteModelVersion(modelVersionId, token) {
   return resp.json();
 }
 
+// Список пользователей для админского интерфейса ролей.
+async function apiAdminListUsers({ token, limit = 50, pageToken = "" }) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (pageToken) qs.set("page_token", pageToken);
+  const resp = await apiFetch(`/admin/users?${qs.toString()}`, { token });
+  return resp.json();
+}
+
+// Назначение роли пользователю (только для admin).
+async function apiAdminSetRole({ token, uid, role }) {
+  const resp = await apiFetch(`/admin/users/${uid}/role`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  return resp.json();
+}
+
 function formatMs(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return `${Math.round(Number(value))} ms`;
@@ -89,6 +110,7 @@ function formatMs(value) {
 export function App() {
   const firebaseReady = getFirebaseConfigStatus();
   const [authUser, setAuthUser] = useState(null);
+  const [authRole, setAuthRole] = useState("editor");
   const [idToken, setIdToken] = useState("");
   const [authMode, setAuthMode] = useState("signin");
   const [loginEmail, setLoginEmail] = useState("");
@@ -113,6 +135,12 @@ export function App() {
 
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminRoleDraftByUid, setAdminRoleDraftByUid] = useState({});
+  const [adminNextPageToken, setAdminNextPageToken] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const [adminSavingUid, setAdminSavingUid] = useState("");
   const [thumbnailsById, setThumbnailsById] = useState(() => {
     try {
       const raw = localStorage.getItem("cadrelay_thumbnails");
@@ -132,13 +160,21 @@ export function App() {
       setDemoUserId(user?.uid || "demo_user_001");
       if (!user) {
         setIdToken("");
+        setAuthRole("editor");
+        setAdminUsers([]);
+        setAdminRoleDraftByUid({});
+        setAdminNextPageToken("");
         return;
       }
       try {
         const token = await getCurrentIdToken();
         setIdToken(token || "");
+        const tokenResult = await getCurrentIdTokenResult();
+        const roleClaim = tokenResult?.claims?.role;
+        setAuthRole(typeof roleClaim === "string" ? roleClaim : "editor");
       } catch {
         setIdToken("");
+        setAuthRole("editor");
       }
     });
     return stop;
@@ -247,8 +283,13 @@ export function App() {
     try {
       await signOutCurrentUser();
       setIdToken("");
+      setAuthRole("editor");
       setRows([]);
       setPreviewModelVersionId("");
+      setAdminUsers([]);
+      setAdminRoleDraftByUid({});
+      setAdminNextPageToken("");
+      setAdminError("");
     } catch (err) {
       setError(String(err.message || err));
     } finally {
@@ -396,6 +437,53 @@ export function App() {
     previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  async function loadAdminUsers({ append = false } = {}) {
+    if (!idToken) return;
+    setAdminError("");
+    setAdminLoading(true);
+    try {
+      const data = await apiAdminListUsers({
+        token: idToken,
+        limit: 50,
+        pageToken: append ? adminNextPageToken : "",
+      });
+      const incoming = Array.isArray(data.users) ? data.users : [];
+      setAdminUsers((prev) => (append ? [...prev, ...incoming] : incoming));
+      setAdminRoleDraftByUid((prev) => {
+        const next = { ...prev };
+        for (const row of incoming) {
+          if (!next[row.uid]) next[row.uid] = row.role;
+        }
+        return next;
+      });
+      setAdminNextPageToken(data.next_page_token || "");
+    } catch (err) {
+      setAdminError(String(err.message || err));
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  async function saveUserRole(uid) {
+    if (!idToken) return;
+    const role = adminRoleDraftByUid[uid];
+    if (!role) return;
+    setAdminError("");
+    setAdminSavingUid(uid);
+    try {
+      const updated = await apiAdminSetRole({ token: idToken, uid, role });
+      setAdminUsers((prev) => prev.map((row) => (row.uid === uid ? updated : row)));
+      // Если админ меняет роль себе, сразу обновим локальную роль UI.
+      if (authUser?.uid === uid) {
+        setAuthRole(updated.role);
+      }
+    } catch (err) {
+      setAdminError(String(err.message || err));
+    } finally {
+      setAdminSavingUid("");
+    }
+  }
+
   return (
     <main className="page">
       <h1>CADRelay MVP</h1>
@@ -403,13 +491,18 @@ export function App() {
       <section className="card">
         <div className="row">
           <h2>Auth</h2>
-          {authUser ? <span className="badge">uid: {authUser.uid}</span> : <span className="badge">not signed in</span>}
+          {authUser ? (
+            <span className="badge">uid: {authUser.uid}</span>
+          ) : (
+            <span className="badge">not signed in</span>
+          )}
         </div>
         {!firebaseReady ? (
           <p className="muted">Firebase config не найден. Добавь VITE_FIREBASE_* в frontend/.env.local.</p>
         ) : authUser ? (
           <div className="actions">
             <p className="muted">{authUser.email || authUser.uid}</p>
+            <p className="muted">Role: {authRole}</p>
             <button type="button" onClick={handleSignOut} disabled={authBusy}>
               {authBusy ? "Выход..." : "Sign out"}
             </button>
@@ -456,6 +549,71 @@ export function App() {
           </form>
         )}
       </section>
+
+      {authUser && authRole === "admin" ? (
+        <section className="card">
+          <div className="row">
+            <h2>Admin: Users & Roles</h2>
+            <button type="button" onClick={() => loadAdminUsers({ append: false })} disabled={adminLoading}>
+              {adminLoading ? "Loading..." : "Refresh users"}
+            </button>
+          </div>
+
+          {adminUsers.length === 0 ? (
+            <p className="muted">Пользователи пока не загружены.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>UID</th>
+                  <th>Email</th>
+                  <th>Verified</th>
+                  <th>Role</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminUsers.map((u) => (
+                  <tr key={u.uid}>
+                    <td>{u.uid}</td>
+                    <td>{u.email || "-"}</td>
+                    <td>{u.email_verified ? "yes" : "no"}</td>
+                    <td>
+                      <select
+                        value={adminRoleDraftByUid[u.uid] || u.role}
+                        onChange={(e) =>
+                          setAdminRoleDraftByUid((prev) => ({ ...prev, [u.uid]: e.target.value }))
+                        }
+                      >
+                        <option value="viewer">viewer</option>
+                        <option value="editor">editor</option>
+                        <option value="reviewer">reviewer</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => saveUserRole(u.uid)}
+                        disabled={adminSavingUid === u.uid}
+                      >
+                        {adminSavingUid === u.uid ? "Saving..." : "Apply"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {adminNextPageToken ? (
+            <button type="button" onClick={() => loadAdminUsers({ append: true })} disabled={adminLoading}>
+              {adminLoading ? "Loading..." : "Load more"}
+            </button>
+          ) : null}
+          {adminError ? <p className="error">{adminError}</p> : null}
+        </section>
+      ) : null}
 
       <form className="card" onSubmit={handleUpload}>
         <label>

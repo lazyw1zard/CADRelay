@@ -22,7 +22,7 @@
   - send verification email after sign up
   - show verification status in UI
   - define which actions are blocked until email is verified
-- [ ] Define and implement admin-only endpoint(s) for role assignment (UI-safe replacement for direct script usage).
+- [x] Define and implement admin-only endpoint(s) for role assignment (UI-safe replacement for direct script usage).
 
 ## Near-term roadmap
 - [ ] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic).

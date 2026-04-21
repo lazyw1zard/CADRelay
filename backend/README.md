@@ -78,3 +78,14 @@ python .\scripts\set_firebase_role.py --uid <FIREBASE_UID> --role editor --crede
 ```
 
 After changing claims, user should sign out/sign in to refresh token.
+
+### Admin API for role management
+These endpoints are backend-side replacement for manual script usage and are intended for future admin UI.
+
+- `GET /api/v1/admin/users?limit=50&page_token=...`
+  - lists Firebase Auth users with resolved app role
+  - available only for `admin` role
+- `POST /api/v1/admin/users/{uid}/role`
+  - body: `{ "role": "viewer|editor|reviewer|admin" }`
+  - updates Firebase custom claims for target user
+  - available only for `admin` role
