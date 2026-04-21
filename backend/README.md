@@ -21,7 +21,7 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - This data directory is ignored by git and will be replaced with Firestore + object storage adapters later.
 - By default backend auto-triggers one worker run after each upload.
 - To disable this behavior set `CADRELAY_AUTO_WORKER_ENABLED=false` in `backend/.env`.
-- Supported upload formats: `step`, `stp`, `iges`, `igs`, `3mf`, `stl`.
+- Supported upload formats: `step`, `stp`, `iges`, `igs`, `3mf`, `stl`, `obj`.
 
 ## Firestore mode
 By default metadata backend is `local`.

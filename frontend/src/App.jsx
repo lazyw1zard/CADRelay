@@ -741,6 +741,7 @@ export function App() {
             <option value="igs">igs</option>
             <option value="3mf">3mf</option>
             <option value="stl">stl</option>
+            <option value="obj">obj</option>
           </select>
         </label>
 

@@ -30,6 +30,7 @@ SUPPORTED_EXTENSIONS = {
     "igs": ".igs",
     "3mf": ".3mf",
     "stl": ".stl",
+    "obj": ".obj",
 }
 
 

@@ -34,6 +34,7 @@ C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --que
 - Converts CAD (`step/stp/iges/igs`) to mesh using `gmsh` and exports GLB via `trimesh`.
 - Converts `3mf` directly via `trimesh` (without gmsh meshing stage).
 - Converts `stl` directly via `trimesh` (without gmsh meshing stage).
+- Converts `obj` directly via `trimesh` (without gmsh meshing stage).
 - Saves GLB to storage and updates model version status to `ready`.
 - On conversion error updates status to `failed` and stores error in queue message.
 - In `--queue-stats` mode prints counts and recent failed errors.

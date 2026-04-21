@@ -76,6 +76,14 @@ def convert_cad_file_to_glb_bytes(input_path: Path, profile: str = "balanced") -
             glb = glb.encode("utf-8")
         return glb
 
+    # OBJ тоже mesh-формат: читаем как scene, чтобы не потерять многодетальные модели.
+    if input_path.suffix.lower() == ".obj":
+        mesh = _load_mesh_from_scene(input_path)
+        glb = mesh.export(file_type="glb")
+        if isinstance(glb, str):
+            glb = glb.encode("utf-8")
+        return glb
+
     # 1) Через gmsh импортируем CAD (STEP/IGES), строим треугольную сетку и пишем STL.
     # 2) Через trimesh читаем STL и экспортируем GLB-байты.
     with tempfile.TemporaryDirectory(prefix="cadrelay_convert_") as tmp_dir:
