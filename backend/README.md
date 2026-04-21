@@ -22,6 +22,7 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - By default backend auto-triggers one worker run after each upload.
 - To disable this behavior set `CADRELAY_AUTO_WORKER_ENABLED=false` in `backend/.env`.
 - Supported upload formats: `step`, `stp`, `iges`, `igs`, `3mf`, `stl`, `obj`.
+- Queue backend is selected via `CADRELAY_QUEUE_BACKEND` (`local` by default).
 
 ## Firestore mode
 By default metadata backend is `local`.
@@ -32,6 +33,7 @@ Example `backend/.env`:
 ```env
 CADRELAY_METADATA_BACKEND=firestore
 CADRELAY_STORAGE_BACKEND=local
+CADRELAY_QUEUE_BACKEND=local
 CADRELAY_AUTO_WORKER_ENABLED=true
 FIREBASE_PROJECT_ID=cad-relay
 FIREBASE_STORAGE_BUCKET=<your-firebase-storage-bucket>
@@ -43,6 +45,10 @@ Then run server normally:
 ```powershell
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+Queue backend modes:
+- `local`: fully working in MVP (`backend/data/queue.json`).
+- `redis` / `sqs`: scaffold only for now (API raises explicit "not implemented in MVP yet").
 
 ## Auth mode (MVP)
 By default auth is disabled (`CADRELAY_AUTH_MODE=disabled`) to keep local flow simple.

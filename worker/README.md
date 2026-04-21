@@ -29,7 +29,8 @@ C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --que
 ```
 
 ## Current behavior
-- Reads pending messages from `backend/data/queue.json`.
+- Reads pending messages via queue backend abstraction (`CADRELAY_QUEUE_BACKEND`).
+- For `local` backend uses `backend/data/queue.json`.
 - Loads original CAD bytes from active storage backend (`local` or `firebase`).
 - Converts CAD (`step/stp/iges/igs`) to mesh using `gmsh` and exports GLB via `trimesh`.
 - Converts `3mf` directly via `trimesh` (without gmsh meshing stage).
@@ -39,3 +40,7 @@ C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --que
 - On conversion error updates status to `failed` and stores error in queue message.
 - In `--queue-stats` mode prints counts and recent failed errors.
 - In `--queue-prune` mode removes old `processed/failed` messages.
+
+## Queue backend note
+- `CADRELAY_QUEUE_BACKEND=local` works end-to-end in MVP.
+- `redis` / `sqs` backends are scaffolded for future migration and currently return explicit "not implemented in MVP yet".

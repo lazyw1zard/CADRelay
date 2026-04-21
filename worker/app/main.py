@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import tempfile
 import time
@@ -18,7 +17,13 @@ BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+from app.core.config import settings  # noqa: E402
 from app.services.metadata_store import get_model_version, update_model_version  # noqa: E402
+from app.services.queue import (  # noqa: E402
+    get_queue_backend_name,
+    load_queue_messages,
+    save_queue_messages,
+)
 from app.services.storage_store import load_bytes, save_glb_bytes  # noqa: E402
 from converter import SUPPORTED_PROFILES, convert_cad_file_to_glb_bytes  # noqa: E402
 
@@ -38,17 +43,11 @@ def _default_data_dir() -> Path:
     return BACKEND_DIR / "data"
 
 
-def _load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
-    if not path.exists():
-        return default
-    with path.open("r", encoding="utf-8") as fp:
-        return json.load(fp)
-
-
-def _write_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fp:
-        json.dump(value, fp, ensure_ascii=True, indent=2)
+def _apply_data_dir_override(data_dir: Path) -> None:
+    # Сохраняем совместимость с --data-dir для локального queue backend.
+    if get_queue_backend_name() != "local":
+        return
+    settings.queue_file = data_dir / "queue.json"
 
 
 def _resolve_source_suffix(record: dict[str, Any], storage_key: str) -> str:
@@ -72,8 +71,7 @@ def _resolve_conversion_profile(record: dict[str, Any]) -> str:
 
 def _mark_pending_failed(
     *,
-    queue: dict[str, Any],
-    queue_file: Path,
+    messages: list[dict[str, Any]],
     pending: dict[str, Any],
     error: str,
     model_version_id: str | None,
@@ -87,17 +85,19 @@ def _mark_pending_failed(
             status="failed",
             updated_at=datetime.now(UTC).isoformat(),
         )
-    _write_json(queue_file, queue)
+    save_queue_messages(messages)
 
 
 def print_queue_stats(data_dir: Path, error_limit: int = 10) -> None:
     # Быстрая диагностика очереди без открытия огромного JSON вручную.
-    queue_file = data_dir / "queue.json"
-    queue = _load_json(queue_file, {"messages": []})
-    messages = queue.get("messages", [])
+    _apply_data_dir_override(data_dir)
+    messages = load_queue_messages()
+    backend_name = get_queue_backend_name()
 
     status_counts = Counter(str(m.get("status") or "unknown") for m in messages)
-    print(f"queue_file={queue_file}")
+    print(f"queue_backend={backend_name}")
+    if backend_name == "local":
+        print(f"queue_file={settings.queue_file}")
     print(f"total={len(messages)}")
     print(f"pending={status_counts.get('pending', 0)}")
     print(f"processed={status_counts.get('processed', 0)}")
@@ -133,9 +133,8 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
 
 def prune_queue(data_dir: Path, keep_days: int = 7) -> tuple[int, int]:
     # Удаляем только старые processed/failed, pending не трогаем.
-    queue_file = data_dir / "queue.json"
-    queue = _load_json(queue_file, {"messages": []})
-    messages = queue.get("messages", [])
+    _apply_data_dir_override(data_dir)
+    messages = load_queue_messages()
     if not messages:
         return 0, 0
 
@@ -156,17 +155,15 @@ def prune_queue(data_dir: Path, keep_days: int = 7) -> tuple[int, int]:
         kept.append(item)
 
     if removed:
-        queue["messages"] = kept
-        _write_json(queue_file, queue)
+        save_queue_messages(kept)
     return removed, len(kept)
 
 
 def process_next_message(data_dir: Path, target_model_version_id: str | None = None) -> tuple[bool, str]:
-    # Очередь пока файловая (локальный MVP).
-    queue_file = data_dir / "queue.json"
-    queue = _load_json(queue_file, {"messages": []})
+    _apply_data_dir_override(data_dir)
+    messages = load_queue_messages()
 
-    pending_items = [m for m in queue["messages"] if m.get("status") == "pending"]
+    pending_items = [m for m in messages if m.get("status") == "pending"]
     if target_model_version_id:
         candidates = [
             m
@@ -189,8 +186,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
         model_version_id = payload.get("model_version_id")
         if not model_version_id:
             _mark_pending_failed(
-                queue=queue,
-                queue_file=queue_file,
+                messages=messages,
                 pending=pending,
                 error="missing model_version_id",
                 model_version_id=None,
@@ -205,8 +201,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
         record = get_model_version(model_version_id)
         if record is None:
             _mark_pending_failed(
-                queue=queue,
-                queue_file=queue_file,
+                messages=messages,
                 pending=pending,
                 error="model_version not found",
                 model_version_id=None,
@@ -221,8 +216,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
         storage_key_original = payload.get("storage_key_original") or record.get("storage_key_original")
         if not storage_key_original:
             _mark_pending_failed(
-                queue=queue,
-                queue_file=queue_file,
+                messages=messages,
                 pending=pending,
                 error="missing storage_key_original",
                 model_version_id=model_version_id,
@@ -268,7 +262,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
             pending["processed_at"] = datetime.now(UTC).isoformat()
             pending["conversion_ms"] = conversion_ms
             pending["conversion_profile"] = profile
-            _write_json(queue_file, queue)
+            save_queue_messages(messages)
             print(
                 f"conversion_ms model_version_id={model_version_id} "
                 f"profile={profile} value={conversion_ms}"
@@ -276,8 +270,7 @@ def process_next_message(data_dir: Path, target_model_version_id: str | None = N
             return True, f"processed:{model_version_id}"
         except Exception as exc:  # noqa: BLE001
             _mark_pending_failed(
-                queue=queue,
-                queue_file=queue_file,
+                messages=messages,
                 pending=pending,
                 error=str(exc),
                 model_version_id=model_version_id,

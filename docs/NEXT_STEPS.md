@@ -9,6 +9,8 @@
 - [x] Firebase Authentication integrated (frontend login + backend token verification).
 - [x] Role model scaffold added (`viewer/editor/reviewer/admin`) with route guards.
 - [x] Utility script for Firebase custom claims added (`backend/scripts/set_firebase_role.py`).
+- [x] Admin UI for users/roles is implemented and connected to backend admin endpoints.
+- [x] Upload/conversion now supports `step/stp/iges/igs/3mf/stl/obj`.
 
 ## Next session priority
 - [x] Set `CADRELAY_STORAGE_BACKEND=local` explicitly in `backend/.env` for stable no-cost setup.
@@ -25,10 +27,12 @@
 - [x] Define and implement admin-only endpoint(s) for role assignment (UI-safe replacement for direct script usage).
 
 ## Near-term roadmap
-- [ ] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic).
+- [x] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic):
+  - local queue backend works in MVP
+  - redis/sqs adapters are scaffolded with explicit not-implemented error
 - [x] Add download endpoint for original CAD and GLB by `model_version_id`.
 - [x] Start minimal frontend page: upload + status polling + approve/reject.
-- [ ] Add admin UI page for role management:
+- [x] Add admin UI page for role management:
   - show Firebase users and current roles
   - allow admin to assign/update roles (`viewer/editor/reviewer/admin`)
   - connect UI action to backend role assignment flow (currently `backend/scripts/set_firebase_role.py`)

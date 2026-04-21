@@ -1,55 +1,29 @@
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
-from app.core.config import settings
-
-
-def _load_queue() -> dict[str, Any]:
-    # Если очередь еще не создана, работаем с пустым списком сообщений.
-    if not settings.queue_file.exists():
-        return {"messages": []}
-    with settings.queue_file.open("r", encoding="utf-8") as fp:
-        return json.load(fp)
-
-
-def _save_queue(queue: dict[str, Any]) -> None:
-    # Сохраняем текущее состояние очереди в файл.
-    settings.queue_file.parent.mkdir(parents=True, exist_ok=True)
-    with settings.queue_file.open("w", encoding="utf-8") as fp:
-        json.dump(queue, fp, ensure_ascii=True, indent=2)
+from app.services.queue_backend import get_queue_backend
 
 
 def enqueue_conversion(model_version_id: str, storage_key_original: str) -> str:
-    # Добавляем задачу "нужна конвертация" со статусом pending.
-    queue = _load_queue()
-    message_id = f"msg_{uuid4().hex[:12]}"
-    queue["messages"].append(
-        {
-            "id": message_id,
-            "topic": "conversion_requested",
-            "status": "pending",
-            "created_at": datetime.now(UTC).isoformat(),
-            "payload": {
-                "model_version_id": model_version_id,
-                "storage_key_original": storage_key_original,
-            },
-        }
-    )
-    _save_queue(queue)
-    return message_id
+    # Публичный API для backend: добавить задачу конвертации.
+    return get_queue_backend().enqueue_conversion(model_version_id, storage_key_original)
 
 
 def remove_messages_for_model(model_version_id: str) -> int:
-    queue = _load_queue()
-    before = len(queue["messages"])
-    queue["messages"] = [
-        m for m in queue["messages"] if (m.get("payload") or {}).get("model_version_id") != model_version_id
-    ]
-    removed = before - len(queue["messages"])
-    if removed:
-        _save_queue(queue)
-    return removed
+    # Удаляем все сообщения очереди, связанные с конкретной моделью.
+    return get_queue_backend().remove_messages_for_model(model_version_id)
+
+
+def load_queue_messages() -> list[dict[str, Any]]:
+    # Worker читает текущее состояние очереди через этот слой.
+    return get_queue_backend().load_messages()
+
+
+def save_queue_messages(messages: list[dict[str, Any]]) -> None:
+    # Worker сохраняет обновленные статусы сообщений через общий слой.
+    get_queue_backend().save_messages(messages)
+
+
+def get_queue_backend_name() -> str:
+    return get_queue_backend().backend_name
