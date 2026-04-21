@@ -38,8 +38,8 @@
   - connect UI action to backend role assignment flow (currently `backend/scripts/set_firebase_role.py`)
 
 ## Cross-platform hardening
-- [ ] Add Linux-friendly run scripts and keep PowerShell equivalents.
-- [ ] Add CI smoke checks for backend startup and lint.
+- [x] Add Linux-friendly run scripts and keep PowerShell equivalents.
+- [x] Add CI smoke checks for backend startup and lint.
 
 ## Product/UI polish (after admin)
 - [ ] Run dedicated frontend UI polish pass (design consistency + usability).

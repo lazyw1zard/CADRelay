@@ -12,6 +12,16 @@ python -m pip install -e .[dev]
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+Or from repo root:
+```powershell
+.\scripts\run_backend.ps1
+```
+
+Linux/macOS:
+```bash
+./scripts/run_backend.sh
+```
+
 ## Quick check
 - `GET http://127.0.0.1:8000/health`
 - `GET http://127.0.0.1:8000/docs`
@@ -49,6 +59,14 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 Queue backend modes:
 - `local`: fully working in MVP (`backend/data/queue.json`).
 - `redis` / `sqs`: scaffold only for now (API raises explicit "not implemented in MVP yet").
+
+## Tests and lint
+```powershell
+cd C:\Projects\CADRelay\backend
+.\.venv\Scripts\python.exe -m compileall app scripts
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\ruff.exe check app scripts tests
+```
 
 ## Auth mode (MVP)
 By default auth is disabled (`CADRELAY_AUTH_MODE=disabled`) to keep local flow simple.

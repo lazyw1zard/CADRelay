@@ -28,6 +28,15 @@ cd C:\Projects\CADRelay
 C:\Projects\CADRelay\backend\.venv\Scripts\python.exe .\worker\app\main.py --queue-prune --prune-keep-days 7
 ```
 
+Run via helper scripts from repo root:
+```powershell
+.\scripts\run_worker.ps1 --once
+```
+
+```bash
+./scripts/run_worker.sh --once
+```
+
 ## Current behavior
 - Reads pending messages via queue backend abstraction (`CADRELAY_QUEUE_BACKEND`).
 - For `local` backend uses `backend/data/queue.json`.

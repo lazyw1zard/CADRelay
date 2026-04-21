@@ -116,3 +116,9 @@ def get_queue_backend() -> QueueBackend:
     if _queue_backend is None:
         _queue_backend = _build_backend()
     return _queue_backend
+
+
+def reset_queue_backend_cache() -> None:
+    # Нужен в тестах и при смене настроек на лету.
+    global _queue_backend
+    _queue_backend = None
