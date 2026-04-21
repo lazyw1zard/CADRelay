@@ -10,9 +10,15 @@ from worker.app.converter import convert_cad_file_to_glb_bytes
 
 
 def _create_step_or_iges(path: Path) -> None:
-    gmsh = pytest.importorskip("gmsh")
-    gmsh.initialize()
     try:
+        import gmsh  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"gmsh unavailable for {path.suffix}: {exc}")
+
+    initialized = False
+    try:
+        gmsh.initialize()
+        initialized = True
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.model.add("cadrelay_smoke")
         gmsh.model.occ.addBox(0, 0, 0, 10, 8, 6)
@@ -21,7 +27,11 @@ def _create_step_or_iges(path: Path) -> None:
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"gmsh can't write {path.suffix}: {exc}")
     finally:
-        gmsh.finalize()
+        if initialized:
+            try:
+                gmsh.finalize()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def _create_stl(path: Path) -> None:
