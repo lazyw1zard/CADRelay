@@ -40,6 +40,8 @@
 ## Cross-platform hardening
 - [x] Add Linux-friendly run scripts and keep PowerShell equivalents.
 - [x] Add CI smoke checks for backend startup and lint.
+- [ ] Create GitHub repository and push current branch history.
+- [ ] Enable GitHub Actions in remote repo and verify first CI run is green.
 
 ## Product/UI polish (after admin)
 - [ ] Run dedicated frontend UI polish pass (design consistency + usability).
