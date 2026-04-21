@@ -1,5 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -12,6 +19,7 @@ let appInstance = null;
 let authInstance = null;
 
 function isFirebaseConfigured() {
+  // Проверяем минимум env-полей для запуска Firebase SDK.
   return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
 }
 
@@ -44,7 +52,10 @@ export async function signInEmailPassword(email, password) {
 
 export async function signUpEmailPassword(email, password) {
   const auth = getFirebaseAuth();
-  return createUserWithEmailAndPassword(auth, email, password);
+  const credentials = await createUserWithEmailAndPassword(auth, email, password);
+  // Сразу отправляем письмо подтверждения после регистрации.
+  await sendEmailVerification(credentials.user);
+  return credentials;
 }
 
 export async function signOutCurrentUser() {
@@ -52,14 +63,30 @@ export async function signOutCurrentUser() {
   await signOut(auth);
 }
 
-export async function getCurrentIdToken() {
+export async function getCurrentIdToken(forceRefresh = false) {
   const auth = getFirebaseAuth();
   if (!auth.currentUser) return "";
-  return auth.currentUser.getIdToken();
+  // forceRefresh=true нужен после verify email, чтобы получить свежие claims.
+  return auth.currentUser.getIdToken(forceRefresh);
 }
 
 export async function getCurrentIdTokenResult() {
   const auth = getFirebaseAuth();
   if (!auth.currentUser) return null;
   return auth.currentUser.getIdTokenResult();
+}
+
+export async function resendVerificationEmail() {
+  const auth = getFirebaseAuth();
+  if (!auth.currentUser) return;
+  // Повторно шлем verification email текущему пользователю.
+  await sendEmailVerification(auth.currentUser);
+}
+
+export async function refreshCurrentUser() {
+  const auth = getFirebaseAuth();
+  if (!auth.currentUser) return null;
+  // Обновляем пользователя из Firebase (актуализирует emailVerified).
+  await auth.currentUser.reload();
+  return auth.currentUser;
 }

@@ -18,7 +18,7 @@
   - final status `ready`
 - [x] Add endpoint to list recent model versions (for simple UI table).
 - [x] Add frontend `Sign up` flow (email/password) and default onboarding role behavior.
-- [ ] Add email verification flow:
+- [x] Add email verification flow:
   - send verification email after sign up
   - show verification status in UI
   - define which actions are blocked until email is verified

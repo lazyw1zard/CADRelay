@@ -57,6 +57,7 @@ Notes:
 - API expects `Authorization: Bearer <firebase_id_token>` when firebase auth mode is enabled.
 - `owner_user_id` for uploaded models is taken from token `uid` in firebase mode.
 - Non-admin user can access only own model versions.
+- Write actions require verified email (`email_verified=true` in Firebase token claims).
 
 ## Role policy (MVP)
 Roles are read from Firebase custom claims (`role`).

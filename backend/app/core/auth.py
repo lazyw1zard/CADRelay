@@ -17,6 +17,8 @@ ALLOWED_ROLES = {"viewer", "editor", "reviewer", "admin"}
 class CurrentUser:
     user_id: str
     role: str = "viewer"
+    # Для write/admin-операций требуем подтвержденный email.
+    email_verified: bool = False
     auth_provider: str = "dev"
     auth_subject: str | None = None
 
@@ -87,7 +89,13 @@ def get_current_user(
     # Disabled mode оставляет текущий MVP-поток без login UI.
     if settings.auth_mode != "firebase":
         user_id = (x_demo_user_id or "demo_user").strip() or "demo_user"
-        return CurrentUser(user_id=user_id, role="admin", auth_provider="dev", auth_subject=user_id)
+        return CurrentUser(
+            user_id=user_id,
+            role="admin",
+            email_verified=True,
+            auth_provider="dev",
+            auth_subject=user_id,
+        )
 
     bearer_token = token.credentials if token and token.credentials else (access_token or "").strip()
     if not bearer_token:
@@ -108,6 +116,8 @@ def get_current_user(
     return CurrentUser(
         user_id=user_id,
         role=role,
+        # Firebase кладет этот флаг в claims id-токена.
+        email_verified=bool(claims.get("email_verified")),
         auth_provider="firebase",
         auth_subject=str(claims.get("sub", user_id)),
     )

@@ -4,6 +4,8 @@ import {
   getCurrentIdToken,
   getCurrentIdTokenResult,
   getFirebaseConfigStatus,
+  refreshCurrentUser,
+  resendVerificationEmail,
   signInEmailPassword,
   signUpEmailPassword,
   signOutCurrentUser,
@@ -111,6 +113,8 @@ export function App() {
   const firebaseReady = getFirebaseConfigStatus();
   const [authUser, setAuthUser] = useState(null);
   const [authRole, setAuthRole] = useState("editor");
+  // Локальный флаг: можно ли делать write/admin действия в UI.
+  const [emailVerified, setEmailVerified] = useState(false);
   const [idToken, setIdToken] = useState("");
   const [authMode, setAuthMode] = useState("signin");
   const [loginEmail, setLoginEmail] = useState("");
@@ -141,6 +145,8 @@ export function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [adminSavingUid, setAdminSavingUid] = useState("");
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [authInfo, setAuthInfo] = useState("");
   const [thumbnailsById, setThumbnailsById] = useState(() => {
     try {
       const raw = localStorage.getItem("cadrelay_thumbnails");
@@ -161,20 +167,26 @@ export function App() {
       if (!user) {
         setIdToken("");
         setAuthRole("editor");
+        setEmailVerified(false);
+        setAuthInfo("");
         setAdminUsers([]);
         setAdminRoleDraftByUid({});
         setAdminNextPageToken("");
         return;
       }
       try {
+        // На каждом входе синхронизируем token + role + verify-статус.
         const token = await getCurrentIdToken();
         setIdToken(token || "");
         const tokenResult = await getCurrentIdTokenResult();
         const roleClaim = tokenResult?.claims?.role;
         setAuthRole(typeof roleClaim === "string" ? roleClaim : "editor");
+        const verifiedClaim = tokenResult?.claims?.email_verified;
+        setEmailVerified(Boolean(user.emailVerified || verifiedClaim));
       } catch {
         setIdToken("");
         setAuthRole("editor");
+        setEmailVerified(Boolean(user.emailVerified));
       }
     });
     return stop;
@@ -242,6 +254,7 @@ export function App() {
   async function handleAuthSubmit(e) {
     e.preventDefault();
     setError("");
+    setAuthInfo("");
     if (!firebaseReady) {
       setError("Firebase config не настроен в frontend/.env.local");
       return;
@@ -264,11 +277,19 @@ export function App() {
     try {
       if (authMode === "signup") {
         await signUpEmailPassword(email, loginPassword);
+        // После signup backend-запись не откроется до подтверждения email.
+        setAuthInfo("Письмо подтверждения отправлено. Проверь почту и подтверди email.");
       } else {
         await signInEmailPassword(email, loginPassword);
       }
       const token = await getCurrentIdToken();
       setIdToken(token || "");
+      const tokenResult = await getCurrentIdTokenResult();
+      const roleClaim = tokenResult?.claims?.role;
+      setAuthRole(typeof roleClaim === "string" ? roleClaim : "editor");
+      const verifiedClaim = tokenResult?.claims?.email_verified;
+      // Берем verify-флаг из claims, чтобы UI работал одинаково после reload.
+      setEmailVerified(Boolean(verifiedClaim));
       setConfirmPassword("");
     } catch (err) {
       setError(String(err.message || err));
@@ -277,13 +298,55 @@ export function App() {
     }
   }
 
+  async function handleResendVerification() {
+    setError("");
+    setAuthInfo("");
+    setVerifyBusy(true);
+    try {
+      await resendVerificationEmail();
+      setAuthInfo("Письмо подтверждения отправлено повторно.");
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
+  async function handleRefreshVerification() {
+    setError("");
+    setAuthInfo("");
+    setVerifyBusy(true);
+    try {
+      const refreshedUser = await refreshCurrentUser();
+      setAuthUser(refreshedUser);
+      const token = await getCurrentIdToken(true);
+      setIdToken(token || "");
+      const tokenResult = await getCurrentIdTokenResult();
+      const verifiedClaim = tokenResult?.claims?.email_verified;
+      // Считаем verified, если это видно в user или уже пришло в token claims.
+      const isVerified = Boolean(refreshedUser?.emailVerified || verifiedClaim);
+      setEmailVerified(isVerified);
+      if (isVerified) {
+        setAuthInfo("Email подтвержден. Ограничения сняты.");
+      } else {
+        setAuthInfo("Email пока не подтвержден.");
+      }
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
   async function handleSignOut() {
     setError("");
+    setAuthInfo("");
     setAuthBusy(true);
     try {
       await signOutCurrentUser();
       setIdToken("");
       setAuthRole("editor");
+      setEmailVerified(false);
       setRows([]);
       setPreviewModelVersionId("");
       setAdminUsers([]);
@@ -300,6 +363,11 @@ export function App() {
   async function handleUpload(e) {
     e.preventDefault();
     setError("");
+    // До подтверждения email не даем создавать новые записи.
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы загружать модели.");
+      return;
+    }
     if (!file) {
       setError("Выбери файл");
       return;
@@ -345,6 +413,10 @@ export function App() {
 
   async function approve(id, decision) {
     setError("");
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы отправлять approve/reject.");
+      return;
+    }
     try {
       // Сохраняем решение, затем перечитываем статус строки.
       await apiApproval(id, decision, comment, demoUserId, idToken);
@@ -356,6 +428,10 @@ export function App() {
 
   async function removeModelVersion(id) {
     setError("");
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы удалять версии.");
+      return;
+    }
     try {
       await apiDeleteModelVersion(id, idToken);
       setRows((prev) => prev.filter((r) => r.id !== id));
@@ -439,6 +515,11 @@ export function App() {
 
   async function loadAdminUsers({ append = false } = {}) {
     if (!idToken) return;
+    // Админ-операции в UI дополнительно блокируем до verify email.
+    if (!emailVerified) {
+      setAdminError("Подтверди email, чтобы управлять пользователями.");
+      return;
+    }
     setAdminError("");
     setAdminLoading(true);
     try {
@@ -466,6 +547,10 @@ export function App() {
 
   async function saveUserRole(uid) {
     if (!idToken) return;
+    if (!emailVerified) {
+      setAdminError("Подтверди email, чтобы менять роли.");
+      return;
+    }
     const role = adminRoleDraftByUid[uid];
     if (!role) return;
     setAdminError("");
@@ -503,6 +588,17 @@ export function App() {
           <div className="actions">
             <p className="muted">{authUser.email || authUser.uid}</p>
             <p className="muted">Role: {authRole}</p>
+            <p className="muted">Email verified: {emailVerified ? "yes" : "no"}</p>
+            {!emailVerified ? (
+              <>
+                <button type="button" onClick={handleResendVerification} disabled={verifyBusy}>
+                  {verifyBusy ? "Отправка..." : "Resend verification"}
+                </button>
+                <button type="button" onClick={handleRefreshVerification} disabled={verifyBusy}>
+                  {verifyBusy ? "Проверка..." : "I verified my email"}
+                </button>
+              </>
+            ) : null}
             <button type="button" onClick={handleSignOut} disabled={authBusy}>
               {authBusy ? "Выход..." : "Sign out"}
             </button>
@@ -548,13 +644,18 @@ export function App() {
             </button>
           </form>
         )}
+        {authInfo ? <p className="muted">{authInfo}</p> : null}
       </section>
 
       {authUser && authRole === "admin" ? (
         <section className="card">
           <div className="row">
             <h2>Admin: Users & Roles</h2>
-            <button type="button" onClick={() => loadAdminUsers({ append: false })} disabled={adminLoading}>
+            <button
+              type="button"
+              onClick={() => loadAdminUsers({ append: false })}
+              disabled={adminLoading || !emailVerified}
+            >
               {adminLoading ? "Loading..." : "Refresh users"}
             </button>
           </div>
@@ -581,6 +682,7 @@ export function App() {
                     <td>
                       <select
                         value={adminRoleDraftByUid[u.uid] || u.role}
+                        disabled={!emailVerified || adminSavingUid === u.uid}
                         onChange={(e) =>
                           setAdminRoleDraftByUid((prev) => ({ ...prev, [u.uid]: e.target.value }))
                         }
@@ -595,7 +697,7 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => saveUserRole(u.uid)}
-                        disabled={adminSavingUid === u.uid}
+                        disabled={adminSavingUid === u.uid || !emailVerified}
                       >
                         {adminSavingUid === u.uid ? "Saving..." : "Apply"}
                       </button>
@@ -607,7 +709,11 @@ export function App() {
           )}
 
           {adminNextPageToken ? (
-            <button type="button" onClick={() => loadAdminUsers({ append: true })} disabled={adminLoading}>
+            <button
+              type="button"
+              onClick={() => loadAdminUsers({ append: true })}
+              disabled={adminLoading || !emailVerified}
+            >
               {adminLoading ? "Loading..." : "Load more"}
             </button>
           ) : null}
@@ -650,7 +756,8 @@ export function App() {
           <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </label>
 
-        <button disabled={loading}>{loading ? "Загрузка..." : "Upload"}</button>
+        {!emailVerified ? <p className="muted">Подтверди email, чтобы загружать и изменять данные.</p> : null}
+        <button disabled={loading || !emailVerified}>{loading ? "Загрузка..." : "Upload"}</button>
       </form>
 
       <section className="card">
@@ -697,9 +804,9 @@ export function App() {
                   <td>
                     <div className="actions">
                       <button type="button" onClick={() => refreshOne(r.id)}>Refresh</button>
-                      <button type="button" onClick={() => approve(r.id, "approve")}>Approve</button>
-                      <button type="button" onClick={() => approve(r.id, "reject")}>Reject</button>
-                      <button type="button" onClick={() => removeModelVersion(r.id)}>Delete</button>
+                      <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>Approve</button>
+                      <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>Reject</button>
+                      <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>Delete</button>
                       <a href={withAuthToken(`${API_BASE}/model-versions/${r.id}/download?kind=original`, idToken)}>
                         Download Original
                       </a>

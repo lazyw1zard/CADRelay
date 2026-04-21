@@ -46,6 +46,12 @@ def _ensure_role(current_user: CurrentUser, allowed: set[str]) -> None:
         raise HTTPException(status_code=403, detail=f"Role '{current_user.role}' is not allowed")
 
 
+def _ensure_email_verified(current_user: CurrentUser) -> None:
+    # Единое правило: любые операции изменения данных только после verify email.
+    if not current_user.email_verified:
+        raise HTTPException(status_code=403, detail="Email is not verified")
+
+
 def _resolve_user_fields(
     owner_user_id: str | None,
     created_by_user_id: str | None,
@@ -81,6 +87,8 @@ async def upload_model(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> UploadResponse:
     _ensure_role(current_user, ROLE_EDIT)
+    # Блокируем upload, пока пользователь не подтвердил почту.
+    _ensure_email_verified(current_user)
     # Нормализуем и проверяем формат, чтобы не тащить неподдерживаемые файлы дальше.
     normalized_format = source_format.lower().strip()
     if normalized_format not in ALLOWED_SOURCE_FORMATS:
@@ -161,6 +169,8 @@ def create_model_version_endpoint(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> ModelVersionResponse:
     _ensure_role(current_user, ROLE_EDIT)
+    # Служебная запись тоже меняет данные -> нужен verified email.
+    _ensure_email_verified(current_user)
     # Служебный endpoint: создает запись версии без загрузки файла.
     model_version_id = f"mv_{uuid4().hex[:12]}"
     owner, creator, provider, subject = _resolve_user_fields(
@@ -237,6 +247,8 @@ def delete_model_version_endpoint(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, str]:
     _ensure_role(current_user, ROLE_EDIT)
+    # Удаление версии и файлов разрешаем только с подтвержденным email.
+    _ensure_email_verified(current_user)
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
@@ -296,6 +308,8 @@ def approve_model_version(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, str]:
     _ensure_role(current_user, ROLE_REVIEW)
+    # Approve/reject влияет на workflow, поэтому тоже с verify email.
+    _ensure_email_verified(current_user)
     # Сохраняем решение клиента по версии модели (approve/reject).
     record = get_model_version(model_version_id)
     if record is None:
@@ -325,6 +339,8 @@ def admin_list_users(
 ) -> AdminUserListResponse:
     # Админ читает список пользователей из Firebase Auth.
     _ensure_role(current_user, ROLE_ADMIN)
+    # Доступ к админке разрешаем только верифицированному админу.
+    _ensure_email_verified(current_user)
     try:
         result = list_auth_users(limit=limit, page_token=page_token)
     except RuntimeError as exc:
@@ -341,6 +357,8 @@ def admin_set_user_role(
 ) -> AdminUserResponse:
     # Админ назначает роль через Firebase custom claims.
     _ensure_role(current_user, ROLE_ADMIN)
+    # Изменение ролей тоже под verify email.
+    _ensure_email_verified(current_user)
     try:
         row = set_auth_user_role(uid=uid, role=payload.role)
     except ValueError as exc:
