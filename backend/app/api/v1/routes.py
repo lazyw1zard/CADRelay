@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import re
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
@@ -73,10 +74,45 @@ def _resolve_user_fields(
     return owner, creator, provider, subject
 
 
+def _normalize_text(value: str | None, *, max_len: int) -> str | None:
+    if value is None:
+        return None
+    cleaned = " ".join(value.strip().split())
+    if not cleaned:
+        return None
+    return cleaned[:max_len]
+
+
+def _parse_tags(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    # Разрешаем ввод через запятую/точку с запятой/новую строку.
+    chunks = re.split(r"[,;\n]+", raw)
+    result: list[str] = []
+    seen: set[str] = set()
+    for chunk in chunks:
+        tag = chunk.strip().lower()
+        if not tag:
+            continue
+        if len(tag) > 32:
+            tag = tag[:32]
+        if tag in seen:
+            continue
+        seen.add(tag)
+        result.append(tag)
+        if len(result) >= 12:
+            break
+    return result
+
+
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
     background_tasks: BackgroundTasks,
-    model_id: str = Form(...),
+    model_id: str | None = Form(None),
+    model_name: str | None = Form(None),
+    model_description: str | None = Form(None),
+    model_category: str | None = Form(None),
+    model_tags: str | None = Form(None),
     source_format: str = Form("step"),
     conversion_profile: str = Form("balanced"),
     owner_user_id: str | None = Form(None),
@@ -96,6 +132,11 @@ async def upload_model(
     normalized_profile = conversion_profile.lower().strip()
     if normalized_profile not in ALLOWED_CONVERSION_PROFILES:
         raise HTTPException(status_code=400, detail="Unsupported conversion_profile")
+    normalized_name = _normalize_text(model_name, max_len=120)
+    normalized_description = _normalize_text(model_description, max_len=2000)
+    normalized_category = _normalize_text(model_category, max_len=64)
+    normalized_tags = _parse_tags(model_tags)
+    resolved_model_id = _normalize_text(model_id, max_len=120) or normalized_name or f"model_{uuid4().hex[:10]}"
 
     # Читаем файл в память и валидируем базовые ограничения.
     payload = await file.read()
@@ -127,7 +168,11 @@ async def upload_model(
     record = create_model_version(
         {
             "id": model_version_id,
-            "model_id": model_id,
+            "model_id": resolved_model_id,
+            "model_name": normalized_name,
+            "model_description": normalized_description,
+            "model_category": normalized_category,
+            "model_tags": normalized_tags,
             "source_format": normalized_format,
             "conversion_profile": normalized_profile,
             "status": "uploaded",
@@ -173,6 +218,11 @@ def create_model_version_endpoint(
     _ensure_email_verified(current_user)
     # Служебный endpoint: создает запись версии без загрузки файла.
     model_version_id = f"mv_{uuid4().hex[:12]}"
+    normalized_name = _normalize_text(payload.model_name, max_len=120)
+    normalized_description = _normalize_text(payload.model_description, max_len=2000)
+    normalized_category = _normalize_text(payload.model_category, max_len=64)
+    normalized_tags = _parse_tags(",".join(payload.model_tags or []))
+    resolved_model_id = _normalize_text(payload.model_id, max_len=120) or normalized_name or f"model_{uuid4().hex[:10]}"
     owner, creator, provider, subject = _resolve_user_fields(
         owner_user_id=payload.owner_user_id,
         created_by_user_id=payload.created_by_user_id,
@@ -183,7 +233,11 @@ def create_model_version_endpoint(
     record = create_model_version(
         {
             "id": model_version_id,
-            "model_id": payload.model_id,
+            "model_id": resolved_model_id,
+            "model_name": normalized_name,
+            "model_description": normalized_description,
+            "model_category": normalized_category,
+            "model_tags": normalized_tags,
             "source_format": payload.source_format,
             "conversion_profile": payload.conversion_profile,
             "status": "uploaded",

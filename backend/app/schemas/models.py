@@ -4,7 +4,11 @@ from pydantic import BaseModel, Field
 
 
 class ModelVersionCreate(BaseModel):
-    model_id: str = Field(min_length=1)
+    model_id: str | None = Field(default=None, min_length=1)
+    model_name: str | None = Field(default=None, min_length=1, max_length=120)
+    model_description: str | None = Field(default=None, max_length=2000)
+    model_category: str | None = Field(default=None, min_length=1, max_length=64)
+    model_tags: list[str] | None = None
     source_format: str = Field(default="step", min_length=1)
     conversion_profile: str = Field(default="balanced", pattern="^(fast|balanced|high)$")
     owner_user_id: str | None = None
@@ -16,6 +20,10 @@ class ModelVersionCreate(BaseModel):
 class ModelVersionResponse(BaseModel):
     id: str
     model_id: str
+    model_name: str | None = None
+    model_description: str | None = None
+    model_category: str | None = None
+    model_tags: list[str] | None = None
     source_format: str
     conversion_profile: str | None = None
     status: str

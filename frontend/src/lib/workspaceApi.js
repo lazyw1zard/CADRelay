@@ -1,0 +1,80 @@
+const API_BASE = "http://127.0.0.1:8000/api/v1";
+
+export function withAuthToken(url, token) {
+  if (!token) return url;
+  const qs = new URLSearchParams();
+  qs.set("access_token", token);
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}${qs.toString()}`;
+}
+
+async function apiFetch(path, { token = "", method = "GET", headers = {}, body, cache = "no-store" } = {}) {
+  const finalHeaders = new Headers(headers);
+  if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
+  const resp = await fetch(`${API_BASE}${path}`, { method, headers: finalHeaders, body, cache });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`${method} ${path} failed (${resp.status}): ${text}`);
+  }
+  return resp;
+}
+
+export async function apiListModelVersions({ ownerUserId, token, limit = 100 }) {
+  const qs = new URLSearchParams();
+  if (ownerUserId) qs.set("owner_user_id", ownerUserId);
+  qs.set("limit", String(limit));
+  const resp = await apiFetch(`/model-versions?${qs.toString()}`, { token });
+  return resp.json();
+}
+
+export async function apiGetModelVersion(id, token) {
+  const resp = await apiFetch(`/model-versions/${id}?ts=${Date.now()}`, { token });
+  return resp.json();
+}
+
+export async function apiUploadModel({
+  modelName,
+  modelDescription,
+  modelCategory,
+  modelTags,
+  sourceFormat,
+  conversionProfile,
+  file,
+  token,
+}) {
+  const form = new FormData();
+  // Передаем только бизнес-поля модели, без технических id в UI.
+  form.append("model_name", modelName);
+  form.append("model_description", modelDescription || "");
+  form.append("model_category", modelCategory || "");
+  form.append("model_tags", modelTags || "");
+  form.append("source_format", sourceFormat);
+  form.append("conversion_profile", conversionProfile);
+  form.append("file", file);
+
+  const resp = await apiFetch("/uploads", { token, method: "POST", body: form });
+  return resp.json();
+}
+
+export async function apiApproveModelVersion({ modelVersionId, decision, comment, actorUserId, token }) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}/approval`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      decision,
+      comment: comment || null,
+      created_by_user_id: actorUserId || null,
+    }),
+  });
+  return resp.json();
+}
+
+export async function apiDeleteModelVersion(modelVersionId, token) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
+  return resp.json();
+}
+
+export function buildDownloadUrl({ modelVersionId, kind, token }) {
+  return withAuthToken(`${API_BASE}/model-versions/${modelVersionId}/download?kind=${kind}`, token);
+}

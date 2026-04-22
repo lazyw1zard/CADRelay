@@ -51,9 +51,23 @@ async function apiListModelVersions({ ownerUserId, token }) {
 }
 
 // Загрузка файла модели в backend через multipart/form-data.
-async function apiUpload({ modelId, sourceFormat, conversionProfile, file, ownerUserId, token }) {
+async function apiUpload({
+  modelName,
+  modelDescription,
+  modelCategory,
+  modelTags,
+  sourceFormat,
+  conversionProfile,
+  file,
+  ownerUserId,
+  token,
+}) {
   const form = new FormData();
-  form.append("model_id", modelId);
+  // Передаем человеко-понятные поля модели; model_id backend соберет сам.
+  form.append("model_name", modelName);
+  form.append("model_description", modelDescription || "");
+  form.append("model_category", modelCategory || "");
+  form.append("model_tags", modelTags || "");
   form.append("source_format", sourceFormat);
   form.append("conversion_profile", conversionProfile);
   if (ownerUserId) {
@@ -121,8 +135,10 @@ export function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
-  const [demoUserId, setDemoUserId] = useState("demo_user_001");
-  const [modelId, setModelId] = useState("model_demo_ui");
+  const [modelName, setModelName] = useState("");
+  const [modelDescription, setModelDescription] = useState("");
+  const [modelCategory, setModelCategory] = useState("");
+  const [modelTags, setModelTags] = useState("");
   const [sourceFormat, setSourceFormat] = useState("step");
   const [conversionProfile, setConversionProfile] = useState("balanced");
   const [file, setFile] = useState(null);
@@ -162,8 +178,6 @@ export function App() {
     if (!firebaseReady) return undefined;
     const stop = watchAuthState(async (user) => {
       setAuthUser(user || null);
-      // Для наглядности синхронизируем поле owner с uid текущего пользователя.
-      setDemoUserId(user?.uid || "demo_user_001");
       if (!user) {
         setIdToken("");
         setAuthRole("editor");
@@ -212,7 +226,7 @@ export function App() {
       }
       setError("");
       try {
-        const list = await apiListModelVersions({ ownerUserId: demoUserId, token: idToken });
+        const list = await apiListModelVersions({ ownerUserId: authUser?.uid, token: idToken });
         if (!cancelled) {
           setRows(list);
           // По умолчанию выбираем самую свежую модель со статусом ready.
@@ -228,7 +242,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [demoUserId, idToken]);
+  }, [authUser?.uid, idToken]);
 
   useEffect(() => {
     if (firebaseReady && !idToken) return undefined;
@@ -372,16 +386,23 @@ export function App() {
       setError("Выбери файл");
       return;
     }
+    if (!modelName.trim()) {
+      setError("Укажи название модели");
+      return;
+    }
 
     setLoading(true);
     try {
       // После загрузки сразу показываем новую строку в таблице.
       const data = await apiUpload({
-        modelId,
+        modelName: modelName.trim(),
+        modelDescription: modelDescription.trim(),
+        modelCategory: modelCategory.trim(),
+        modelTags,
         sourceFormat,
         conversionProfile,
         file,
-        ownerUserId: demoUserId,
+        ownerUserId: authUser?.uid,
         token: idToken,
       });
       const row = data.model_version;
@@ -419,7 +440,7 @@ export function App() {
     }
     try {
       // Сохраняем решение, затем перечитываем статус строки.
-      await apiApproval(id, decision, comment, demoUserId, idToken);
+      await apiApproval(id, decision, comment, authUser?.uid, idToken);
       await refreshOne(id);
     } catch (err) {
       setError(String(err.message || err));
@@ -723,13 +744,40 @@ export function App() {
 
       <form className="card" onSubmit={handleUpload}>
         <label>
-          Demo User ID
-          <input value={demoUserId} onChange={(e) => setDemoUserId(e.target.value)} />
+          Model Name
+          <input
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+            placeholder="Например: Universal Clamp v2"
+          />
         </label>
 
         <label>
-          Model ID
-          <input value={modelId} onChange={(e) => setModelId(e.target.value)} />
+          Description
+          <textarea
+            rows={3}
+            value={modelDescription}
+            onChange={(e) => setModelDescription(e.target.value)}
+            placeholder="Кратко: для чего модель, особенности печати/сборки"
+          />
+        </label>
+
+        <label>
+          Category
+          <input
+            value={modelCategory}
+            onChange={(e) => setModelCategory(e.target.value)}
+            placeholder="Например: Tools"
+          />
+        </label>
+
+        <label>
+          Tags
+          <input
+            value={modelTags}
+            onChange={(e) => setModelTags(e.target.value)}
+            placeholder="Например: clamp, workshop, printable"
+          />
         </label>
 
         <label>
@@ -781,8 +829,10 @@ export function App() {
             <thead>
               <tr>
                 <th>Thumb</th>
-                <th>ID</th>
+                <th>Model</th>
                 <th>Status</th>
+                <th>Category</th>
+                <th>Tags</th>
                 <th>Source</th>
                 <th>GLB</th>
                 <th>Actions</th>
@@ -800,8 +850,13 @@ export function App() {
                       <span className="muted">-</span>
                     )}
                   </td>
-                  <td>{r.id}</td>
+                  <td>
+                    <div>{r.model_name || r.model_id || r.id}</div>
+                    {r.model_description ? <div className="muted">{r.model_description}</div> : null}
+                  </td>
                   <td>{r.status}</td>
+                  <td>{r.model_category || "-"}</td>
+                  <td>{Array.isArray(r.model_tags) && r.model_tags.length > 0 ? r.model_tags.join(", ") : "-"}</td>
                   <td>{r.storage_key_original || "-"}</td>
                   <td>{r.storage_key_glb || "-"}</td>
                   <td>

@@ -48,6 +48,9 @@
 - [ ] Introduce shared design tokens (colors, spacing, typography, states).
 - [ ] Improve model/version table UX (status chips, clearer actions, better layout hierarchy).
 - [ ] Separate main areas into clearer screens/sections: Auth, Workspace, Admin.
+- [ ] Add user collections in workspace:
+  - liked models
+  - favorites/saved models
 - [ ] Add robust empty/error/loading states (no raw backend error text in final UX).
 - [ ] Ensure responsive behavior for desktop/mobile and basic accessibility (focus states, keyboard navigation, labels).
 - [ ] Add subtle motion for transitions/loading without impacting performance.

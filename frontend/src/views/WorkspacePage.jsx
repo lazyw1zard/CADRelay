@@ -1,0 +1,324 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { generateGlbThumbnail } from "../lib/thumbnail";
+import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
+import {
+  apiApproveModelVersion,
+  apiDeleteModelVersion,
+  apiGetModelVersion,
+  apiListModelVersions,
+  buildDownloadUrl,
+} from "../lib/workspaceApi";
+
+function getUserInitial(authUser) {
+  const source = authUser?.email || authUser?.uid || "U";
+  return source.trim().charAt(0).toUpperCase();
+}
+
+export function WorkspacePage() {
+  const navigate = useNavigate();
+  const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [comment, setComment] = useState("");
+  const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
+  const [thumbnailFailedById, setThumbnailFailedById] = useState({});
+  const [thumbnailsById, setThumbnailsById] = useState(() => {
+    try {
+      const raw = localStorage.getItem("cadrelay_thumbnails");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Загружаем список моделей текущего пользователя.
+    if (!authUser || !idToken) return;
+    let cancelled = false;
+
+    async function loadRows() {
+      setLoading(true);
+      setError("");
+      try {
+        const list = await apiListModelVersions({ ownerUserId: authUser.uid, token: idToken, limit: 100 });
+        if (!cancelled) setRows(list);
+      } catch (err) {
+        if (!cancelled) setError(String(err?.message || err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadRows();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, idToken]);
+
+  useEffect(() => {
+    if (!authUser || !idToken) return undefined;
+    // Автопуллинг только pending/processing записей.
+    const timer = setInterval(async () => {
+      const processingIds = rows.filter((r) => r.status === "processing" || r.status === "uploaded").map((r) => r.id);
+      if (processingIds.length === 0) return;
+
+      try {
+        const updates = await Promise.all(processingIds.map((id) => apiGetModelVersion(id, idToken)));
+        setRows((prev) => {
+          const byId = new Map(updates.map((u) => [u.id, u]));
+          return prev.map((r) => byId.get(r.id) || r);
+        });
+      } catch {
+        // Не блокируем интерфейс, ручной refresh всегда доступен.
+      }
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [rows, authUser, idToken]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("cadrelay_thumbnails", JSON.stringify(thumbnailsById));
+    } catch {
+      // Если localStorage недоступен, просто пропускаем кеш.
+    }
+  }, [thumbnailsById]);
+
+  useEffect(() => {
+    // Генерируем миниатюры только для ready-моделей с GLB.
+    if (!authUser || !idToken || thumbnailInProgressId) return;
+    const next = rows.find((r) => r.storage_key_glb && !thumbnailsById[r.id] && !thumbnailFailedById[r.id]);
+    if (!next) return;
+
+    setThumbnailInProgressId(next.id);
+    const url = buildDownloadUrl({ modelVersionId: next.id, kind: "glb", token: idToken });
+    generateGlbThumbnail(url)
+      .then((png) => {
+        if (!isMountedRef.current || !png) return;
+        setThumbnailsById((prev) => ({ ...prev, [next.id]: png }));
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setThumbnailFailedById((prev) => ({ ...prev, [next.id]: true }));
+      })
+      .finally(() => {
+        if (isMountedRef.current) setThumbnailInProgressId("");
+      });
+  }, [rows, thumbnailsById, thumbnailFailedById, thumbnailInProgressId, authUser, idToken]);
+
+  const processingCount = useMemo(
+    () => rows.filter((r) => r.status === "processing" || r.status === "uploaded").length,
+    [rows]
+  );
+
+  async function refreshModels() {
+    if (!authUser || !idToken) return;
+    setLoading(true);
+    setError("");
+    try {
+      const list = await apiListModelVersions({ ownerUserId: authUser.uid, token: idToken, limit: 100 });
+      setRows(list);
+    } catch (err) {
+      setError(String(err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshOne(id) {
+    setError("");
+    try {
+      const updated = await apiGetModelVersion(id, idToken);
+      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    } catch (err) {
+      setError(String(err?.message || err));
+    }
+  }
+
+  async function approve(id, decision) {
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы отправлять approve/reject.");
+      return;
+    }
+    setError("");
+    try {
+      await apiApproveModelVersion({
+        modelVersionId: id,
+        decision,
+        comment,
+        actorUserId: authUser?.uid,
+        token: idToken,
+      });
+      await refreshOne(id);
+    } catch (err) {
+      setError(String(err?.message || err));
+    }
+  }
+
+  async function removeModelVersion(id) {
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы удалять версии.");
+      return;
+    }
+    setError("");
+    try {
+      await apiDeleteModelVersion(id, idToken);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      setThumbnailsById((prev) => {
+        if (!prev[id]) return prev;
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      setThumbnailFailedById((prev) => {
+        if (!prev[id]) return prev;
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+    } catch (err) {
+      setError(String(err?.message || err));
+    }
+  }
+
+  if (!firebaseReady) {
+    return (
+      <main className="page workspace-page">
+        <section className="card">
+          <h2>Workspace</h2>
+          <p className="error">Firebase config не найден. Добавь VITE_FIREBASE_* в frontend/.env.local.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authReady) {
+    return (
+      <main className="page workspace-page">
+        <section className="card">
+          <p className="muted">Проверяем вход...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authUser) return <Navigate to="/auth" replace />;
+
+  return (
+    <main className="page workspace-page">
+      <h1>Workspace</h1>
+      <p className="muted">Твои модели и действия по версиям.</p>
+
+      <section className="workspace-dashboard-top">
+        <article className="card workspace-user-card">
+          <div className="workspace-user-avatar">{getUserInitial(authUser)}</div>
+          <div>
+            <h2>Profile</h2>
+            <p className="muted">{authUser.email || authUser.uid}</p>
+            <p className="muted">Role: {authRole}</p>
+            <p className="muted">Email verified: {emailVerified ? "yes" : "no"}</p>
+          </div>
+        </article>
+
+        <article className="card workspace-actions-card">
+          <h2>Actions</h2>
+          <div className="workspace-actions-right">
+            <button type="button" onClick={() => navigate("/workspace/new")}>
+              Add new model
+            </button>
+            <button type="button" onClick={refreshModels} disabled={loading}>
+              {loading ? "Loading..." : "Refresh models"}
+            </button>
+          </div>
+          <label>
+            Comment for approve/reject
+            <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Опционально" />
+          </label>
+          <span className="badge">processing: {processingCount}</span>
+        </article>
+      </section>
+
+      <section className="card">
+        <div className="row">
+          <h2>My uploaded models</h2>
+          <span className="muted">{rows.length} items</span>
+        </div>
+
+        {rows.length === 0 ? (
+          <p className="muted">Пока пусто. Добавь модель через кнопку справа.</p>
+        ) : (
+          <div className="workspace-model-grid">
+            {rows.map((r) => (
+              <article key={r.id} className="workspace-model-card">
+                <button
+                  type="button"
+                  className="workspace-model-thumb-btn"
+                  onClick={() => r.storage_key_glb && navigate(`/workspace/render/${r.id}`)}
+                  disabled={!r.storage_key_glb}
+                  title={r.storage_key_glb ? "Open render page" : "GLB пока не готов"}
+                >
+                  {thumbnailsById[r.id] ? (
+                    <img className="table-thumb" src={thumbnailsById[r.id]} alt={`${r.id} thumbnail`} />
+                  ) : thumbnailInProgressId === r.id ? (
+                    <span className="muted">...</span>
+                  ) : (
+                    <span className="muted">No thumb</span>
+                  )}
+                </button>
+
+                <div className="workspace-model-main">
+                  <h3>{r.model_name || r.model_id || r.id}</h3>
+                  {r.model_description ? <p className="muted">{r.model_description}</p> : null}
+                  <p className="muted">status: {r.status}</p>
+                  {r.model_category ? <p className="muted">category: {r.model_category}</p> : null}
+                  {Array.isArray(r.model_tags) && r.model_tags.length > 0 ? (
+                    <p className="muted">tags: {r.model_tags.join(", ")}</p>
+                  ) : null}
+                </div>
+
+                <div className="workspace-model-actions">
+                  <button type="button" onClick={() => refreshOne(r.id)}>
+                    Refresh
+                  </button>
+                  <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
+                    Approve
+                  </button>
+                  <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
+                    Reject
+                  </button>
+                  <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
+                    Delete
+                  </button>
+                  {r.storage_key_glb ? (
+                    <button type="button" onClick={() => navigate(`/workspace/render/${r.id}`)}>
+                      Render
+                    </button>
+                  ) : null}
+                  <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>
+                    Original
+                  </a>
+                  {r.storage_key_glb ? (
+                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>GLB</a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {authError ? <p className="error">{authError}</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+    </main>
+  );
+}
