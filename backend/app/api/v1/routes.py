@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 import re
 from uuid import uuid4
 
@@ -14,6 +15,8 @@ from app.schemas.models import (
     AdminUserListResponse,
     AdminUserResponse,
     ApprovalDecision,
+    ExploreModelCardResponse,
+    ExploreModelListResponse,
     ModelVersionCreate,
     ModelVersionResponse,
     UploadResponse,
@@ -28,7 +31,8 @@ from app.services.metadata_store import (
     update_model_version,
 )
 from app.services.queue import enqueue_conversion, remove_messages_for_model
-from app.services.storage_store import delete_bytes, load_bytes, save_original_bytes
+from app.services.storage_store import delete_bytes, load_bytes, save_original_bytes, save_thumbnail_bytes
+from app.services.three_mf import extract_thumbnail_from_3mf
 from app.services.worker_runner import run_worker_once_for_model
 
 router = APIRouter()
@@ -39,6 +43,8 @@ ROLE_VIEW = {"viewer", "editor", "reviewer", "admin"}
 ROLE_EDIT = {"editor", "admin"}
 ROLE_REVIEW = {"editor", "reviewer", "admin"}
 ROLE_ADMIN = {"admin"}
+ALLOWED_THUMBNAIL_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+ALLOWED_THUMBNAIL_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
 def _ensure_role(current_user: CurrentUser, allowed: set[str]) -> None:
@@ -105,6 +111,23 @@ def _parse_tags(raw: str | None) -> list[str]:
     return result
 
 
+def _is_supported_thumbnail(upload: UploadFile) -> bool:
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext in ALLOWED_THUMBNAIL_EXTENSIONS:
+        return True
+    content_type = (upload.content_type or "").lower().strip()
+    return content_type in ALLOWED_THUMBNAIL_CONTENT_TYPES
+
+
+def _thumbnail_media_type(storage_key: str) -> str:
+    ext = Path(storage_key).suffix.lower()
+    if ext in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if ext == ".webp":
+        return "image/webp"
+    return "image/png"
+
+
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
     background_tasks: BackgroundTasks,
@@ -120,6 +143,7 @@ async def upload_model(
     auth_provider: str | None = Form(None),
     auth_subject: str | None = Form(None),
     file: UploadFile = File(...),
+    thumbnail_file: UploadFile | None = File(None),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> UploadResponse:
     _ensure_role(current_user, ROLE_EDIT)
@@ -145,8 +169,29 @@ async def upload_model(
     if len(payload) > settings.max_upload_bytes:
         raise HTTPException(status_code=413, detail="File exceeds max upload size")
 
-    # Генерируем id версии модели и сохраняем оригинальный файл.
+    # Генерируем id версии модели заранее, чтобы привязать к нему все артефакты.
     model_version_id = f"mv_{uuid4().hex[:12]}"
+
+    thumbnail_payload: bytes | None = None
+    thumbnail_filename = "thumbnail.png"
+    thumbnail_content_type: str | None = None
+    if thumbnail_file is not None:
+        if not _is_supported_thumbnail(thumbnail_file):
+            raise HTTPException(status_code=400, detail="Unsupported thumbnail format")
+        thumbnail_payload = await thumbnail_file.read()
+        if thumbnail_payload:
+            if len(thumbnail_payload) > settings.max_thumbnail_bytes:
+                raise HTTPException(status_code=413, detail="Thumbnail exceeds max upload size")
+            thumbnail_filename = thumbnail_file.filename or "thumbnail.png"
+            thumbnail_content_type = thumbnail_file.content_type
+    elif normalized_format == "3mf":
+        # Если пользователь не приложил превью, пробуем взять встроенную миниатюру из 3MF.
+        embedded_thumbnail = extract_thumbnail_from_3mf(payload, max_bytes=settings.max_thumbnail_bytes)
+        if embedded_thumbnail is not None:
+            thumbnail_payload = embedded_thumbnail.payload
+            thumbnail_filename = embedded_thumbnail.filename
+            thumbnail_content_type = embedded_thumbnail.content_type
+
     owner, creator, provider, subject = _resolve_user_fields(
         owner_user_id=owner_user_id,
         created_by_user_id=created_by_user_id,
@@ -155,6 +200,15 @@ async def upload_model(
         actor=current_user,
     )
     try:
+        storage_key_thumbnail_custom: str | None = None
+        if thumbnail_payload:
+            # Сохраняем кастомную миниатюру пользователя для приоритетного показа в UI.
+            storage_key_thumbnail_custom = save_thumbnail_bytes(
+                model_version_id=model_version_id,
+                filename=thumbnail_filename,
+                payload=thumbnail_payload,
+                content_type=thumbnail_content_type,
+            )
         storage_key_original, checksum, size_bytes = save_original_bytes(
             model_version_id=model_version_id,
             filename=file.filename or "upload.step",
@@ -183,6 +237,7 @@ async def upload_model(
             "auth_subject": subject,
             "storage_key_original": storage_key_original,
             "storage_key_glb": None,
+            "storage_key_thumbnail_custom": storage_key_thumbnail_custom,
             "checksum": checksum,
             "size_bytes": size_bytes,
             "created_at": datetime.now(UTC).isoformat(),
@@ -248,6 +303,7 @@ def create_model_version_endpoint(
             "auth_subject": subject,
             "storage_key_original": None,
             "storage_key_glb": None,
+            "storage_key_thumbnail_custom": None,
             "checksum": None,
             "size_bytes": None,
             "created_at": datetime.now(UTC).isoformat(),
@@ -273,12 +329,56 @@ def list_model_versions_endpoint(
     return [ModelVersionResponse(**row) for row in rows]
 
 
+@router.get("/explore/model-versions", response_model=ExploreModelListResponse)
+def list_explore_model_versions_endpoint(
+    limit: int = Query(default=24, ge=1, le=60),
+    offset: int = Query(default=0, ge=0),
+) -> ExploreModelListResponse:
+    # Публичная лента: отдаем только ready-модели с пагинацией.
+    rows = list_model_versions(status="ready", limit=limit + 1, offset=offset)
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+
+    items = [
+        ExploreModelCardResponse(
+            id=row["id"],
+            model_id=row.get("model_id") or row["id"],
+            model_name=row.get("model_name"),
+            model_description=row.get("model_description"),
+            model_category=row.get("model_category"),
+            model_tags=row.get("model_tags") or [],
+            source_format=row.get("source_format") or "step",
+            conversion_profile=row.get("conversion_profile"),
+            status=row.get("status") or "ready",
+            owner_user_id=row.get("owner_user_id"),
+            created_at=row.get("created_at"),
+            preview_available=bool(row.get("storage_key_glb")),
+            custom_thumbnail_available=bool(row.get("storage_key_thumbnail_custom")),
+        )
+        for row in page_rows
+    ]
+    next_offset = offset + limit if has_more else None
+    return ExploreModelListResponse(items=items, next_offset=next_offset)
+
+
 def _ensure_can_access(record: dict, current_user: CurrentUser) -> None:
     owner = record.get("owner_user_id")
     if current_user.is_admin:
         return
     if owner and owner != current_user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _ensure_can_read_access(record: dict, current_user: CurrentUser) -> None:
+    # Чтение/скачивание ready-моделей разрешаем любому авторизованному пользователю.
+    owner = record.get("owner_user_id")
+    if current_user.is_admin:
+        return
+    if owner and owner == current_user.user_id:
+        return
+    if record.get("status") == "ready":
+        return
+    raise HTTPException(status_code=403, detail="Access denied")
 
 
 @router.get("/model-versions/{model_version_id}", response_model=ModelVersionResponse)
@@ -291,7 +391,7 @@ def get_model_version_endpoint(
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
-    _ensure_can_access(record, current_user)
+    _ensure_can_read_access(record, current_user)
     return ModelVersionResponse(**record)
 
 
@@ -311,7 +411,11 @@ def delete_model_version_endpoint(
     # Убираем сообщения из локальной очереди, чтобы worker не обрабатывал удаленную модель.
     remove_messages_for_model(model_version_id)
 
-    for key in (record.get("storage_key_original"), record.get("storage_key_glb")):
+    for key in (
+        record.get("storage_key_original"),
+        record.get("storage_key_glb"),
+        record.get("storage_key_thumbnail_custom"),
+    ):
         if not key:
             continue
         try:
@@ -329,16 +433,21 @@ def delete_model_version_endpoint(
 @router.get("/model-versions/{model_version_id}/download")
 def download_model_version_file(
     model_version_id: str,
-    kind: str = Query(pattern="^(original|glb)$"),
+    kind: str = Query(pattern="^(original|glb|thumbnail)$"),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
     _ensure_role(current_user, ROLE_VIEW)
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
-    _ensure_can_access(record, current_user)
+    _ensure_can_read_access(record, current_user)
 
-    storage_key = record.get("storage_key_original") if kind == "original" else record.get("storage_key_glb")
+    if kind == "original":
+        storage_key = record.get("storage_key_original")
+    elif kind == "glb":
+        storage_key = record.get("storage_key_glb")
+    else:
+        storage_key = record.get("storage_key_thumbnail_custom")
     if not storage_key:
         raise HTTPException(status_code=404, detail=f"{kind} file is not available")
 
@@ -350,7 +459,12 @@ def download_model_version_file(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     filename = storage_key.split("/")[-1]
-    media_type = "application/octet-stream" if kind == "original" else "model/gltf-binary"
+    if kind == "original":
+        media_type = "application/octet-stream"
+    elif kind == "glb":
+        media_type = "model/gltf-binary"
+    else:
+        media_type = _thumbnail_media_type(storage_key)
     headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
     return Response(content=payload, media_type=media_type, headers=headers)
 

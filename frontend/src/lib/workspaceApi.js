@@ -37,6 +37,7 @@ export async function apiUploadModel({
   modelDescription,
   modelCategory,
   modelTags,
+  thumbnailFile,
   sourceFormat,
   conversionProfile,
   file,
@@ -48,6 +49,7 @@ export async function apiUploadModel({
   form.append("model_description", modelDescription || "");
   form.append("model_category", modelCategory || "");
   form.append("model_tags", modelTags || "");
+  if (thumbnailFile) form.append("thumbnail_file", thumbnailFile);
   form.append("source_format", sourceFormat);
   form.append("conversion_profile", conversionProfile);
   form.append("file", file);
@@ -72,6 +74,24 @@ export async function apiApproveModelVersion({ modelVersionId, decision, comment
 
 export async function apiDeleteModelVersion(modelVersionId, token) {
   const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
+  return resp.json();
+}
+
+export async function apiAdminListUsers({ token, limit = 50, pageToken = "" }) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (pageToken) qs.set("page_token", pageToken);
+  const resp = await apiFetch(`/admin/users?${qs.toString()}`, { token });
+  return resp.json();
+}
+
+export async function apiAdminSetUserRole({ token, uid, role }) {
+  const resp = await apiFetch(`/admin/users/${uid}/role`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
   return resp.json();
 }
 

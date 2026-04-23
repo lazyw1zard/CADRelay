@@ -34,6 +34,7 @@ class ModelVersionResponse(BaseModel):
     auth_subject: str | None = None
     storage_key_original: str | None = None
     storage_key_glb: str | None = None
+    storage_key_thumbnail_custom: str | None = None
     checksum: str | None = None
     size_bytes: int | None = None
     conversion_ms: int | None = None
@@ -44,6 +45,27 @@ class ModelVersionResponse(BaseModel):
 class UploadResponse(BaseModel):
     model_version: ModelVersionResponse
     queue_message_id: str
+
+
+class ExploreModelCardResponse(BaseModel):
+    id: str
+    model_id: str
+    model_name: str | None = None
+    model_description: str | None = None
+    model_category: str | None = None
+    model_tags: list[str] | None = None
+    source_format: str
+    conversion_profile: str | None = None
+    status: str
+    owner_user_id: str | None = None
+    created_at: str | None = None
+    preview_available: bool = False
+    custom_thumbnail_available: bool = False
+
+
+class ExploreModelListResponse(BaseModel):
+    items: list[ExploreModelCardResponse]
+    next_offset: int | None = None
 
 
 class ApprovalDecision(BaseModel):

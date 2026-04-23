@@ -97,7 +97,13 @@ export function WorkspacePage() {
   useEffect(() => {
     // Генерируем миниатюры только для ready-моделей с GLB.
     if (!authUser || !idToken || thumbnailInProgressId) return;
-    const next = rows.find((r) => r.storage_key_glb && !thumbnailsById[r.id] && !thumbnailFailedById[r.id]);
+    const next = rows.find(
+      (r) =>
+        !r.storage_key_thumbnail_custom &&
+        r.storage_key_glb &&
+        !thumbnailsById[r.id] &&
+        !thumbnailFailedById[r.id]
+    );
     if (!next) return;
 
     setThumbnailInProgressId(next.id);
@@ -258,58 +264,72 @@ export function WorkspacePage() {
           <p className="muted">Пока пусто. Добавь модель через кнопку справа.</p>
         ) : (
           <div className="workspace-model-grid">
-            {rows.map((r) => (
-              <article key={r.id} className="workspace-model-card">
+            {rows.map((r, idx) => (
+              <article key={r.id} className="model-card workspace-model-card">
                 <button
                   type="button"
-                  className="workspace-model-thumb-btn"
+                  className={`model-card-cover workspace-model-thumb-btn model-card-cover-${(idx % 3) + 1}`}
                   onClick={() => r.storage_key_glb && navigate(`/workspace/render/${r.id}`)}
                   disabled={!r.storage_key_glb}
                   title={r.storage_key_glb ? "Open render page" : "GLB пока не готов"}
                 >
-                  {thumbnailsById[r.id] ? (
-                    <img className="table-thumb" src={thumbnailsById[r.id]} alt={`${r.id} thumbnail`} />
+                  {r.storage_key_thumbnail_custom ? (
+                    <img
+                      className="model-card-cover-img"
+                      src={buildDownloadUrl({ modelVersionId: r.id, kind: "thumbnail", token: idToken })}
+                      alt={`${r.id} custom thumbnail`}
+                    />
+                  ) : thumbnailsById[r.id] ? (
+                    <img className="model-card-cover-img" src={thumbnailsById[r.id]} alt={`${r.id} thumbnail`} />
                   ) : thumbnailInProgressId === r.id ? (
-                    <span className="muted">...</span>
+                    <span className="workspace-thumb-placeholder muted">...</span>
                   ) : (
-                    <span className="muted">No thumb</span>
+                    <span className="workspace-thumb-placeholder muted">No thumb</span>
                   )}
                 </button>
 
-                <div className="workspace-model-main">
+                <div className="model-card-body workspace-model-main">
                   <h3>{r.model_name || r.model_id || r.id}</h3>
-                  {r.model_description ? <p className="muted">{r.model_description}</p> : null}
-                  <p className="muted">status: {r.status}</p>
-                  {r.model_category ? <p className="muted">category: {r.model_category}</p> : null}
+                  {r.model_description ? <p>{r.model_description}</p> : <p>{(r.source_format || "cad").toUpperCase()}</p>}
+                  <div className="model-card-meta">
+                    <span className={`workspace-status-chip workspace-status-${r.status || "unknown"}`}>{r.status || "unknown"}</span>
+                    <span>{r.model_category || "uncategorized"}</span>
+                  </div>
                   {Array.isArray(r.model_tags) && r.model_tags.length > 0 ? (
-                    <p className="muted">tags: {r.model_tags.join(", ")}</p>
+                    <p className="workspace-model-tags">{r.model_tags.join(", ")}</p>
                   ) : null}
-                </div>
 
-                <div className="workspace-model-actions">
-                  <button type="button" onClick={() => refreshOne(r.id)}>
-                    Refresh
-                  </button>
-                  <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
-                    Approve
-                  </button>
-                  <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
-                    Reject
-                  </button>
-                  <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
-                    Delete
-                  </button>
-                  {r.storage_key_glb ? (
-                    <button type="button" onClick={() => navigate(`/workspace/render/${r.id}`)}>
-                      Render
+                  <div className="workspace-model-actions">
+                    <button type="button" onClick={() => refreshOne(r.id)}>
+                      Refresh
                     </button>
-                  ) : null}
-                  <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>
-                    Original
-                  </a>
-                  {r.storage_key_glb ? (
-                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>GLB</a>
-                  ) : null}
+                    <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
+                      Approve
+                    </button>
+                    <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
+                      Reject
+                    </button>
+                    <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
+                      Delete
+                    </button>
+                    {r.storage_key_glb ? (
+                      <button type="button" onClick={() => navigate(`/workspace/render/${r.id}`)}>
+                        Render
+                      </button>
+                    ) : (
+                      <button type="button" disabled>
+                        Render
+                      </button>
+                    )}
+                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>Original</a>
+                    {r.storage_key_glb ? (
+                      <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>GLB</a>
+                    ) : (
+                      <span className="workspace-link-disabled" aria-disabled="true">
+                        GLB
+                      </span>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}

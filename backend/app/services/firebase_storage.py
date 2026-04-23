@@ -47,6 +47,29 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return rel_key
 
 
+def save_thumbnail_bytes(
+    model_version_id: str,
+    filename: str,
+    payload: bytes,
+    content_type: str | None = None,
+) -> str:
+    # Загружаем пользовательскую миниатюру в bucket.
+    safe_name = _safe_filename(filename or "thumbnail.png").lower()
+    ext = Path(safe_name).suffix
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        if content_type == "image/jpeg":
+            ext = ".jpg"
+        elif content_type == "image/webp":
+            ext = ".webp"
+        else:
+            ext = ".png"
+    rel_key = f"thumbnails/{model_version_id}{ext}"
+    blob = _get_bucket().blob(rel_key)
+    resolved_content_type = content_type if content_type in {"image/png", "image/jpeg", "image/webp"} else "image/png"
+    blob.upload_from_string(payload, content_type=resolved_content_type)
+    return rel_key
+
+
 def load_bytes(storage_key: str) -> bytes:
     blob = _get_bucket().blob(storage_key)
     if not blob.exists():

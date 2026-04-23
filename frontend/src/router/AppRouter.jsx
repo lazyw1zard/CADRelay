@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../shell/AppShell";
+import { AdminUsersPage } from "../views/AdminUsersPage";
 import { AuthPage } from "../views/AuthPage";
 import { ExplorePage } from "../views/ExplorePage";
 import { WorkspacePage } from "../views/WorkspacePage";
@@ -15,7 +16,7 @@ export function AppRouter() {
           <Route path="/workspace" element={<WorkspacePage />} />
           <Route path="/workspace/new" element={<WorkspaceUploadPage />} />
           <Route path="/workspace/render/:modelVersionId" element={<WorkspaceRenderPage />} />
-          <Route path="/admin/users" element={<Navigate to="/workspace" replace />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

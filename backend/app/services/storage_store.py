@@ -41,6 +41,15 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return _backend_module().save_glb_bytes(model_version_id, payload)
 
 
+def save_thumbnail_bytes(
+    model_version_id: str,
+    filename: str,
+    payload: bytes,
+    content_type: str | None = None,
+) -> str:
+    return _backend_module().save_thumbnail_bytes(model_version_id, filename, payload, content_type=content_type)
+
+
 def load_bytes(storage_key: str) -> bytes:
     return _backend_module().load_bytes(storage_key)
 

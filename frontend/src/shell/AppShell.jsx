@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { getFirebaseConfigStatus, signOutCurrentUser, watchAuthState } from "../lib/firebaseAuth";
+import {
+  getCurrentIdTokenResult,
+  getFirebaseConfigStatus,
+  signOutCurrentUser,
+  watchAuthState,
+} from "../lib/firebaseAuth";
 
 const THEME_STORAGE_KEY = "cadrelay_theme";
 
@@ -15,6 +20,7 @@ export function AppShell() {
   const [theme, setTheme] = useState(detectInitialTheme);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authUser, setAuthUser] = useState(null);
+  const [authRole, setAuthRole] = useState("editor");
   const location = useLocation();
   const navigate = useNavigate();
   const firebaseReady = getFirebaseConfigStatus();
@@ -33,7 +39,21 @@ export function AppShell() {
   useEffect(() => {
     // Подписываемся на auth-состояние, чтобы кнопка в top bar была актуальной.
     if (!firebaseReady) return undefined;
-    const stop = watchAuthState((user) => setAuthUser(user || null));
+    const stop = watchAuthState(async (user) => {
+      setAuthUser(user || null);
+      if (!user) {
+        setAuthRole("editor");
+        return;
+      }
+      try {
+        // Тянем роль из token claims для отображения admin-ссылок.
+        const tokenResult = await getCurrentIdTokenResult();
+        const roleClaim = tokenResult?.claims?.role;
+        setAuthRole(typeof roleClaim === "string" ? roleClaim : "editor");
+      } catch {
+        setAuthRole("editor");
+      }
+    });
     return stop;
   }, [firebaseReady]);
 
@@ -69,6 +89,14 @@ export function AppShell() {
           >
             Workspace
           </NavLink>
+          {authRole === "admin" ? (
+            <NavLink
+              to="/admin/users"
+              className={({ isActive }) => `shell-link ${isActive ? "shell-link-active" : ""}`}
+            >
+              Admin
+            </NavLink>
+          ) : null}
         </nav>
       </aside>
 
@@ -85,6 +113,11 @@ export function AppShell() {
               <NavLink to="/workspace" className="shell-topbar-link">
                 My Models
               </NavLink>
+              {authRole === "admin" ? (
+                <NavLink to="/admin/users" className="shell-topbar-link">
+                  Admin
+                </NavLink>
+              ) : null}
             </div>
           </div>
           <div className="shell-topbar-actions">

@@ -11,6 +11,7 @@
 - [x] Utility script for Firebase custom claims added (`backend/scripts/set_firebase_role.py`).
 - [x] Admin UI for users/roles is implemented and connected to backend admin endpoints.
 - [x] Upload/conversion now supports `step/stp/iges/igs/3mf/stl/obj`.
+- [x] For `3mf`, embedded thumbnail is auto-extracted on upload when user thumbnail is not provided.
 
 ## Next session priority
 - [x] Set `CADRELAY_STORAGE_BACKEND=local` explicitly in `backend/.env` for stable no-cost setup.
@@ -31,6 +32,7 @@
   - local queue backend works in MVP
   - redis/sqs adapters are scaffolded with explicit not-implemented error
 - [x] Add download endpoint for original CAD and GLB by `model_version_id`.
+- [ ] Expand embedded thumbnail extraction beyond `3mf` (where source format provides preview metadata/assets).
 - [x] Start minimal frontend page: upload + status polling + approve/reject.
 - [x] Add admin UI page for role management:
   - show Firebase users and current roles
@@ -47,7 +49,7 @@
 - [ ] Run dedicated frontend UI polish pass (design consistency + usability).
 - [ ] Introduce shared design tokens (colors, spacing, typography, states).
 - [ ] Improve model/version table UX (status chips, clearer actions, better layout hierarchy).
-- [ ] Separate main areas into clearer screens/sections: Auth, Workspace, Admin.
+- [x] Separate main areas into clearer screens/sections: Auth, Workspace, Admin.
 - [ ] Add user collections in workspace:
   - liked models
   - favorites/saved models

@@ -47,11 +47,13 @@ def list_model_versions(
     owner_user_id: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     return _backend_module().list_model_versions(
         owner_user_id=owner_user_id,
         status=status,
         limit=limit,
+        offset=offset,
     )
 
 

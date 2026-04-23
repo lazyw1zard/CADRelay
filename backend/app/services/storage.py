@@ -31,6 +31,29 @@ def save_glb_bytes(model_version_id: str, payload: bytes) -> str:
     return rel_key
 
 
+def save_thumbnail_bytes(
+    model_version_id: str,
+    filename: str,
+    payload: bytes,
+    content_type: str | None = None,
+) -> str:
+    # Сохраняем пользовательскую миниатюру (png/jpg/webp).
+    safe_name = _safe_filename(filename or "thumbnail.png").lower()
+    ext = Path(safe_name).suffix
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        if content_type == "image/jpeg":
+            ext = ".jpg"
+        elif content_type == "image/webp":
+            ext = ".webp"
+        else:
+            ext = ".png"
+    rel_key = f"thumbnails/{model_version_id}{ext}"
+    abs_path = settings.storage_dir / rel_key
+    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    abs_path.write_bytes(payload)
+    return rel_key
+
+
 def load_bytes(storage_key: str) -> bytes:
     abs_path = settings.storage_dir / storage_key
     if not abs_path.exists():

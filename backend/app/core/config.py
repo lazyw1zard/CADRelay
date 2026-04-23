@@ -22,6 +22,7 @@ class Settings:
         # local | redis | sqs
         self.queue_backend = os.getenv("CADRELAY_QUEUE_BACKEND", "local").strip().lower()
         self.max_upload_bytes = int(os.getenv("CADRELAY_MAX_UPLOAD_BYTES", 50 * 1024 * 1024))
+        self.max_thumbnail_bytes = int(os.getenv("CADRELAY_MAX_THUMBNAIL_BYTES", 5 * 1024 * 1024))
         self.auto_worker_enabled = os.getenv("CADRELAY_AUTO_WORKER_ENABLED", "true").strip().lower() in {
             "1",
             "true",

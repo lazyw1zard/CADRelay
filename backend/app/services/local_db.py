@@ -52,6 +52,7 @@ def list_model_versions(
     owner_user_id: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
     rows = list(data["model_versions"].values())
@@ -60,7 +61,9 @@ def list_model_versions(
     if status:
         rows = [r for r in rows if r.get("status") == status]
     rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
-    return rows[: max(1, min(limit, 200))]
+    safe_limit = max(1, min(limit, 200))
+    safe_offset = max(0, offset)
+    return rows[safe_offset : safe_offset + safe_limit]
 
 
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:

@@ -10,6 +10,7 @@ export function WorkspaceUploadPage() {
   const [modelDescription, setModelDescription] = useState("");
   const [modelCategory, setModelCategory] = useState("");
   const [modelTags, setModelTags] = useState("");
+  const [thumbnailFile, setThumbnailFile] = useState(null);
   const [sourceFormat, setSourceFormat] = useState("step");
   const [conversionProfile, setConversionProfile] = useState("balanced");
   const [file, setFile] = useState(null);
@@ -39,6 +40,7 @@ export function WorkspaceUploadPage() {
         modelDescription: modelDescription.trim(),
         modelCategory: modelCategory.trim(),
         modelTags,
+        thumbnailFile,
         sourceFormat,
         conversionProfile,
         file,
@@ -112,6 +114,11 @@ export function WorkspaceUploadPage() {
         <label>
           Tags
           <input value={modelTags} onChange={(e) => setModelTags(e.target.value)} placeholder="clamp, printable" />
+        </label>
+
+        <label>
+          Custom thumbnail (optional)
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
         </label>
 
         <label>
