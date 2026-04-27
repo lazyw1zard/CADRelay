@@ -14,6 +14,7 @@ export function AuthPage() {
   const navigate = useNavigate();
 
   const [authMode, setAuthMode] = useState("signin");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -51,11 +52,15 @@ export function AuthPage() {
       setError("Пароли не совпадают");
       return;
     }
+    if (authMode === "signup" && displayName.trim().length > 80) {
+      setError("Имя не должно быть длиннее 80 символов");
+      return;
+    }
 
     setBusy(true);
     try {
       if (authMode === "signup") {
-        await signUpEmailPassword(cleanedEmail, password);
+        await signUpEmailPassword(cleanedEmail, password, displayName);
         setInfo("Аккаунт создан. Проверь почту и подтверди email, затем войди.");
       } else {
         await signInEmailPassword(cleanedEmail, password);
@@ -125,6 +130,13 @@ export function AuthPage() {
           Password
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
+
+        {authMode === "signup" ? (
+          <label>
+            Display name
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Например: Denis" />
+          </label>
+        ) : null}
 
         {authMode === "signup" ? (
           <label>

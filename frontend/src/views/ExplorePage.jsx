@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, RefreshCw, Search, UploadCloud } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowRight, RefreshCw, Search, Star, UploadCloud } from "lucide-react";
+import { ModelDetailPanel } from "../components/ModelDetailPanel";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
+import { useFavorites } from "../lib/useFavorites";
 import { withAuthToken } from "../lib/workspaceApi";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
@@ -25,12 +27,14 @@ function renderCardTitle(model) {
 }
 
 export function ExplorePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [nextOffset, setNextOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [authUser, setAuthUser] = useState(null);
   const [idToken, setIdToken] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
@@ -44,6 +48,8 @@ export function ExplorePage() {
   });
   const isMountedRef = useRef(true);
   const firebaseReady = getFirebaseConfigStatus();
+  const selectedModelId = searchParams.get("model") || "";
+  const { isFavorite, toggleFavorite } = useFavorites(authUser?.uid);
 
   async function loadFirstPage() {
     setLoading(true);
@@ -93,9 +99,11 @@ export function ExplorePage() {
     // Для загрузки GLB-preview берем токен текущего пользователя.
     const stop = watchAuthState(async (user) => {
       if (!user) {
+        setAuthUser(null);
         setIdToken("");
         return;
       }
+      setAuthUser(user);
       try {
         const token = await getCurrentIdToken();
         setIdToken(token || "");
@@ -165,6 +173,23 @@ export function ExplorePage() {
     });
   }, [items, activeFilter, searchTerm]);
 
+  const selectedModel = useMemo(
+    () => items.find((model) => model.id === selectedModelId) || null,
+    [items, selectedModelId]
+  );
+
+  function openModelDetails(modelId) {
+    const next = new URLSearchParams(searchParams);
+    next.set("model", modelId);
+    setSearchParams(next);
+  }
+
+  function closeModelDetails() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("model");
+    setSearchParams(next);
+  }
+
   return (
     <div className="page page-wide explore-page">
       <section className="explore-hero">
@@ -177,9 +202,6 @@ export function ExplorePage() {
           <Link to="/workspace" className="btn-primary">
             Open Workspace
             <ArrowRight size={16} />
-          </Link>
-          <Link to="/auth" className="btn-ghost">
-            Sign in
           </Link>
         </div>
       </section>
@@ -235,7 +257,19 @@ export function ExplorePage() {
 
       <section className="explore-grid">
         {visibleItems.map((model, idx) => (
-          <article key={model.id} className="model-card">
+          <article
+            key={model.id}
+            className="model-card model-card-clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openModelDetails(model.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openModelDetails(model.id);
+              }
+            }}
+          >
             <div className={`model-card-cover model-card-cover-${(idx % 3) + 1}`}>
               {idToken && model.custom_thumbnail_available ? (
                 <img
@@ -248,6 +282,18 @@ export function ExplorePage() {
               ) : null}
             </div>
             <div className="model-card-body">
+              <button
+                type="button"
+                className="card-favorite-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(model);
+                }}
+                aria-label={isFavorite(model.id) ? "Remove from favorites" : "Add to favorites"}
+                title={isFavorite(model.id) ? "Remove from favorites" : "Add to favorites"}
+              >
+                <Star size={16} fill={isFavorite(model.id) ? "currentColor" : "none"} />
+              </button>
               <h3>{renderCardTitle(model)}</h3>
               {model.model_description ? <p>{model.model_description}</p> : <p>{model.source_format.toUpperCase()}</p>}
               <div className="model-card-meta">
@@ -255,13 +301,17 @@ export function ExplorePage() {
                 <span>{Array.isArray(model.model_tags) ? model.model_tags.slice(0, 2).join(", ") : ""}</span>
               </div>
               <div className="explore-card-actions">
-                <Link
-                  to={model.preview_available ? `/workspace/render/${model.id}` : "/workspace"}
+                <button
+                  type="button"
                   className="btn-ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openModelDetails(model.id);
+                  }}
                 >
-                  {model.preview_available ? "Open render" : "Open workspace"}
+                  Подробнее
                   <ArrowRight size={15} />
-                </Link>
+                </button>
               </div>
             </div>
           </article>
@@ -284,6 +334,16 @@ export function ExplorePage() {
           </button>
         ) : null}
       </div>
+
+      <ModelDetailPanel
+        model={selectedModel}
+        idToken={idToken}
+        thumbnail={selectedModel ? thumbnailsById[selectedModel.id] : ""}
+        viewerUser={authUser}
+        isFavorite={selectedModel ? isFavorite(selectedModel.id) : false}
+        onToggleFavorite={() => selectedModel && toggleFavorite(selectedModel)}
+        onClose={closeModelDetails}
+      />
     </div>
   );
 }

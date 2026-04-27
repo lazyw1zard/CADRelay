@@ -6,6 +6,7 @@ import {
   sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -50,9 +51,13 @@ export async function signInEmailPassword(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
 }
 
-export async function signUpEmailPassword(email, password) {
+export async function signUpEmailPassword(email, password, displayName = "") {
   const auth = getFirebaseAuth();
   const credentials = await createUserWithEmailAndPassword(auth, email, password);
+  const cleanedName = displayName.trim();
+  if (cleanedName) {
+    await updateProfile(credentials.user, { displayName: cleanedName });
+  }
   // Сразу отправляем письмо подтверждения после регистрации.
   await sendEmailVerification(credentials.user);
   return credentials;
@@ -87,6 +92,15 @@ export async function refreshCurrentUser() {
   const auth = getFirebaseAuth();
   if (!auth.currentUser) return null;
   // Обновляем пользователя из Firebase (актуализирует emailVerified).
+  await auth.currentUser.reload();
+  return auth.currentUser;
+}
+
+export async function updateCurrentUserDisplayName(displayName) {
+  const auth = getFirebaseAuth();
+  if (!auth.currentUser) throw new Error("No authenticated user");
+  const cleanedName = displayName.trim();
+  await updateProfile(auth.currentUser, { displayName: cleanedName || null });
   await auth.currentUser.reload();
   return auth.currentUser;
 }

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, Download, Eye, RefreshCw, Trash2, UploadCloud, X } from "lucide-react";
+import { Check, Download, Edit3, Eye, RefreshCw, Save, Star, Trash2, UploadCloud, X } from "lucide-react";
 import { generateGlbThumbnail } from "../lib/thumbnail";
+import { useFavorites } from "../lib/useFavorites";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
+import { updateCurrentUserDisplayName } from "../lib/firebaseAuth";
 import {
   apiApproveModelVersion,
   apiDeleteModelVersion,
@@ -19,10 +21,15 @@ function getUserInitial(authUser) {
 export function WorkspacePage() {
   const navigate = useNavigate();
   const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
+  const { favorites, removeFavorite } = useFavorites(authUser?.uid);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [comment, setComment] = useState("");
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileNameDraft, setProfileNameDraft] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
   const [thumbnailsById, setThumbnailsById] = useState(() => {
@@ -41,6 +48,11 @@ export function WorkspacePage() {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    setProfileNameDraft(authUser?.displayName || "");
+    setProfileMessage("");
+  }, [authUser?.uid, authUser?.displayName]);
 
   useEffect(() => {
     // Загружаем список моделей текущего пользователя.
@@ -198,6 +210,24 @@ export function WorkspacePage() {
     }
   }
 
+  async function saveProfileName() {
+    setProfileMessage("");
+    if (profileNameDraft.trim().length > 80) {
+      setProfileMessage("Имя не должно быть длиннее 80 символов.");
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      await updateCurrentUserDisplayName(profileNameDraft);
+      setProfileEditing(false);
+      setProfileMessage("Имя профиля обновлено.");
+    } catch (err) {
+      setProfileMessage(String(err?.message || err));
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
   if (!firebaseReady) {
     return (
       <main className="page workspace-page">
@@ -244,11 +274,38 @@ export function WorkspacePage() {
       <section className="workspace-dashboard-top">
         <article className="card workspace-user-card">
           <div className="workspace-user-avatar">{getUserInitial(authUser)}</div>
-          <div>
-            <h2>Profile</h2>
+          <div className="workspace-user-main">
+            <div className="workspace-user-heading">
+              <h2>Profile</h2>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setProfileEditing((value) => !value)}
+                aria-label="Edit profile name"
+                title="Edit profile name"
+              >
+                <Edit3 size={16} />
+              </button>
+            </div>
+            <p className="workspace-user-name">{authUser.displayName || authUser.email || "Unnamed user"}</p>
             <p className="muted">{authUser.email || authUser.uid}</p>
             <p className="muted">Role: {authRole}</p>
             <p className="muted">Email verified: {emailVerified ? "yes" : "no"}</p>
+            {profileEditing ? (
+              <div className="profile-edit-row">
+                <input
+                  value={profileNameDraft}
+                  onChange={(e) => setProfileNameDraft(e.target.value)}
+                  placeholder="Display name"
+                  aria-label="Display name"
+                />
+                <button type="button" onClick={saveProfileName} disabled={profileSaving}>
+                  <Save size={14} />
+                  {profileSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            ) : null}
+            {profileMessage ? <p className="muted">{profileMessage}</p> : null}
           </div>
         </article>
 
@@ -279,6 +336,79 @@ export function WorkspacePage() {
           <span className="metric-label">Failed</span>
           <span className="metric-value">{rows.filter((r) => r.status === "failed").length}</span>
         </div>
+      </section>
+
+      <section className="card">
+        <div className="row">
+          <h2>Избранные модели</h2>
+          <span className="muted">{favorites.length} items</span>
+        </div>
+
+        {favorites.length === 0 ? (
+          <p className="muted">Сохраняй модели из Explore, чтобы быстро возвращаться к ним здесь.</p>
+        ) : (
+          <div className="workspace-model-grid">
+            {favorites.map((model) => (
+              <article key={model.id} className="model-card workspace-model-card">
+                <button
+                  type="button"
+                  className="model-card-cover workspace-model-thumb-btn"
+                  onClick={() => model.preview_available && navigate(`/workspace/render/${model.id}`)}
+                  disabled={!model.preview_available}
+                  title={model.preview_available ? "Смотреть в 3D" : "GLB пока не готов"}
+                >
+                  {idToken && model.custom_thumbnail_available ? (
+                    <img
+                      className="model-card-cover-img"
+                      src={buildDownloadUrl({ modelVersionId: model.id, kind: "thumbnail", token: idToken })}
+                      alt={`${model.model_name || model.model_id || model.id} thumbnail`}
+                    />
+                  ) : (
+                    <span className="workspace-thumb-placeholder muted">{(model.source_format || "cad").toUpperCase()}</span>
+                  )}
+                </button>
+
+                <div className="model-card-body workspace-model-main">
+                  <h3>{model.model_name || model.model_id || model.id}</h3>
+                  {model.model_description ? <p>{model.model_description}</p> : <p>{(model.source_format || "cad").toUpperCase()}</p>}
+                  <div className="model-card-meta">
+                    <span className={`workspace-status-chip workspace-status-${model.status || "unknown"}`}>
+                      {model.status || "unknown"}
+                    </span>
+                    <span>{model.model_category || "uncategorized"}</span>
+                  </div>
+                  {Array.isArray(model.model_tags) && model.model_tags.length > 0 ? (
+                    <p className="workspace-model-tags">{model.model_tags.join(", ")}</p>
+                  ) : null}
+
+                  <div className="workspace-model-actions">
+                    {model.preview_available ? (
+                      <button type="button" onClick={() => navigate(`/workspace/render/${model.id}`)}>
+                        <Eye size={14} />
+                        Смотреть в 3D
+                      </button>
+                    ) : (
+                      <button type="button" disabled>
+                        <Eye size={14} />
+                        GLB не готов
+                      </button>
+                    )}
+                    {idToken ? (
+                      <a href={buildDownloadUrl({ modelVersionId: model.id, kind: "original", token: idToken })}>
+                        <Download size={14} />
+                        Оригинал
+                      </a>
+                    ) : null}
+                    <button type="button" onClick={() => removeFavorite(model.id)}>
+                      <Star size={14} fill="currentColor" />
+                      Убрать
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="card">

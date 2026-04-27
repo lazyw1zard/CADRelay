@@ -548,6 +548,17 @@ textarea:disabled {
   min-width: 0;
 }
 
+.model-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.model-card-clickable:hover {
+  border-color: color-mix(in srgb, var(--brand) 28%, var(--line));
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
 .model-card-cover {
   aspect-ratio: 16 / 10;
   position: relative;
@@ -580,14 +591,42 @@ textarea:disabled {
 }
 
 .model-card-body {
+  position: relative;
   padding: 13px;
+}
+
+.card-favorite-btn {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-soft);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.card-favorite-btn:hover,
+.card-favorite-btn:focus-visible {
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
 }
 
 .model-card-body h3,
 .workspace-model-main h3 {
+  padding-right: 38px;
   margin: 0 0 6px;
   font-size: 18px;
   line-height: 1.25;
+}
+
+.workspace-model-main h3 {
+  padding-right: 0;
 }
 
 .model-card-body p,
@@ -613,6 +652,185 @@ textarea:disabled {
 
 .explore-card-actions .btn-ghost {
   width: 100%;
+}
+
+.detail-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.detail-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(9, 13, 18, 0.28);
+  padding: 0;
+  pointer-events: auto;
+  animation: detailScrimIn 0.18s ease-out both;
+}
+
+.model-detail-panel {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
+  width: min(480px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  overflow-y: auto;
+  animation: detailPanelIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform, opacity;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.detail-preview {
+  margin: 16px 18px 0;
+  min-height: 230px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 36%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--line) 36%, transparent) 1px, transparent 1px),
+    var(--surface-2);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+.detail-preview img {
+  width: 100%;
+  height: 100%;
+  min-height: 230px;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-status-row,
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.detail-status-row {
+  padding: 12px 18px 0;
+}
+
+.detail-section,
+.detail-grid {
+  margin: 0 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.detail-section p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-item {
+  display: grid;
+  gap: 5px;
+}
+
+.detail-item span {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.detail-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.author-link {
+  justify-self: start;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--link);
+  cursor: pointer;
+  font-weight: 760;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.author-link:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.detail-actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-2));
+}
+
+.detail-actions .button {
+  width: 100%;
+}
+
+@keyframes detailScrimIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes detailPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 .explore-pager {
@@ -757,6 +975,41 @@ textarea {
   font-size: 22px;
   display: grid;
   place-items: center;
+}
+
+.workspace-user-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-user-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workspace-user-heading h2 {
+  margin-bottom: 0;
+}
+
+.workspace-user-name {
+  margin: 8px 0 4px;
+  font-size: 17px;
+  font-weight: 760;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.profile-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.profile-edit-row button {
+  white-space: nowrap;
 }
 
 .workspace-actions-card {
@@ -1102,6 +1355,61 @@ textarea {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+
+  .detail-scrim {
+    background: rgba(9, 13, 18, 0.36);
+  }
+
+  .model-detail-panel {
+    inset: 0;
+    width: auto;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    border-bottom: 0;
+    animation-name: detailPanelUp;
+  }
+
+  .detail-preview {
+    min-height: 210px;
+  }
+
+  .detail-preview img {
+    min-height: 210px;
+  }
+
+  .detail-grid,
+  .detail-actions,
+  .profile-edit-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes detailPanelUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-scrim,
+  .model-detail-panel {
+    animation: none;
+  }
+
+  .model-card-clickable,
+  .icon-btn,
+  .shell-auth-btn,
+  .btn-ghost,
+  .button {
+    transition: none;
   }
 }
 
