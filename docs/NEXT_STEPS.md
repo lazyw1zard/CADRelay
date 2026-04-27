@@ -46,13 +46,43 @@
 - [ ] Enable GitHub Actions in remote repo and verify first CI run is green.
 
 ## Product/UI polish (after admin)
-- [ ] Run dedicated frontend UI polish pass (design consistency + usability).
-- [ ] Introduce shared design tokens (colors, spacing, typography, states).
-- [ ] Improve model/version table UX (status chips, clearer actions, better layout hierarchy).
+- [x] Run dedicated frontend UI polish pass (design consistency + usability).
+- [x] Introduce shared design tokens (colors, spacing, typography, states).
+- [x] Improve model/version table UX (status chips, clearer actions, better layout hierarchy).
 - [x] Separate main areas into clearer screens/sections: Auth, Workspace, Admin.
-- [ ] Add user collections in workspace:
+- [x] Add local MVP favorites in workspace:
+  - saved models are stored in `localStorage` by Firebase UID
+  - favorites are visible in Workspace
+- [ ] Add backend-backed user collections:
   - liked models
-  - favorites/saved models
+  - favorites/saved models across devices
 - [ ] Add robust empty/error/loading states (no raw backend error text in final UX).
 - [ ] Ensure responsive behavior for desktop/mobile and basic accessibility (focus states, keyboard navigation, labels).
-- [ ] Add subtle motion for transitions/loading without impacting performance.
+- [x] Add subtle motion for transitions/loading without impacting performance.
+- [x] Add render viewer toolbar:
+  - fit/reset camera
+  - view presets
+  - grid/axes toggles
+  - wireframe mode
+  - fullscreen and screenshot
+- [x] Add render viewer layer 2 MVP tools:
+  - light/dark background toggle
+  - bounding box and dimensions readout
+  - two-point distance measurement
+  - lightweight lighting presets (`studio/technical/contrast/flat`)
+  - sketch/edge-only inspection mode for cleaner measuring
+  - orthographic 2D views for selected base planes (`front/right/top`)
+
+## Deferred ideas
+- [ ] Render viewer advanced controls:
+  - section/clipping plane for inspecting internals, wall thickness and hidden cavities
+  - true 2D section extraction from an arbitrary selected plane
+  - exportable sketch extraction from model/section to SVG/DXF
+  - material modes (`original/clay/normal`) after performance check on heavier GLB files
+  - optional lighting advanced panel (`intensity`, `direction`, `exposure`)
+  - model-unit calibration and explicit units (`mm/inch/model units`)
+  - persistent per-user viewer preferences after backend-backed user settings exist
+- [ ] Public/user profile improvements:
+  - mini-profile popover from author name
+  - author rating, uploaded model count and status
+  - display name availability/validation rules

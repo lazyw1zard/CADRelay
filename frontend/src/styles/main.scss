@@ -1204,7 +1204,45 @@ textarea {
   min-width: 0;
 }
 
+.render-model-card > .row {
+  align-items: flex-start;
+}
+
+.render-model-card h2 {
+  margin-bottom: 0;
+}
+
+.render-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 10px 0 14px;
+}
+
+.render-meta-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  color: var(--text-soft);
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.render-meta-strip strong {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .viewer-shell {
+  position: relative;
   border: 1px solid var(--workspace-line);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -1215,10 +1253,70 @@ textarea {
   background: #0f141a;
 }
 
+.viewer-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  pointer-events: none;
+}
+
+.viewer-toolbar .icon-btn {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.viewer-tool-active {
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: color-mix(in srgb, var(--brand-soft) 90%, var(--surface)) !important;
+}
+
 .viewer-canvas {
   width: 100%;
   height: min(62vh, 620px);
   min-height: 420px;
+}
+
+.viewer-readout {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+
+.viewer-readout span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--text-soft);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.viewer-shell:fullscreen {
+  border-radius: 0;
+  border: 0;
+}
+
+.viewer-shell:fullscreen .viewer-canvas {
+  width: 100vw;
+  height: 100vh;
 }
 
 .viewer-shell .muted,
