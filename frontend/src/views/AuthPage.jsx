@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { LogIn, UserPlus } from "lucide-react";
 import {
   getFirebaseConfigStatus,
   getCurrentIdTokenResult,
@@ -133,6 +134,7 @@ export function AuthPage() {
         ) : null}
 
         <button type="submit" disabled={busy}>
+          {authMode === "signup" ? <UserPlus size={16} /> : <LogIn size={16} />}
           {busy ? "Обработка..." : authMode === "signup" ? "Create account" : "Sign in"}
         </button>
       </form>

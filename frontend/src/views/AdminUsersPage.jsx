@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft, RefreshCw, Save } from "lucide-react";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import { apiAdminListUsers, apiAdminSetUserRole } from "../lib/workspaceApi";
 
@@ -114,12 +115,17 @@ export function AdminUsersPage() {
   return (
     <main className="page workspace-page admin-users-page">
       <section className="card workspace-upload-header">
-        <h1>Admin: Users & Roles</h1>
+        <div>
+          <p className="page-kicker">Administration</p>
+          <h1>Users & Roles</h1>
+        </div>
         <div className="workspace-actions-right">
           <button type="button" onClick={() => navigate("/workspace")}>
+            <ArrowLeft size={16} />
             Back to workspace
           </button>
           <button type="button" onClick={() => loadUsers({ append: false })} disabled={loading || !emailVerified}>
+            <RefreshCw size={16} />
             {loading ? "Loading..." : "Refresh users"}
           </button>
         </div>
@@ -165,6 +171,7 @@ export function AdminUsersPage() {
                       onClick={() => saveUserRole(u.uid)}
                       disabled={savingUid === u.uid || !emailVerified}
                     >
+                      <Save size={14} />
                       {savingUid === u.uid ? "Saving..." : "Apply"}
                     </button>
                   </td>

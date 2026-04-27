@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Box, Download } from "lucide-react";
 import { apiGetModelVersion, buildDownloadUrl } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 
@@ -77,10 +78,14 @@ export function WorkspaceRenderPage() {
   if (!authUser) return <Navigate to="/auth" replace />;
 
   return (
-    <main className="page workspace-page">
+    <main className="page page-wide workspace-page">
       <section className="card workspace-upload-header">
-        <h1>Render Model</h1>
-        <button type="button" onClick={() => navigate("/workspace")}>
+        <div>
+          <p className="page-kicker">Web render</p>
+          <h1>Render Model</h1>
+        </div>
+        <button type="button" className="button button-secondary" onClick={() => navigate("/workspace")}>
+          <ArrowLeft size={16} />
           Back to workspace
         </button>
       </section>
@@ -97,8 +102,20 @@ export function WorkspaceRenderPage() {
       {!loading && row && row.storage_key_glb ? (
         <section className="card">
           <div className="row">
-            <h2>{row.model_name || row.model_id || row.id}</h2>
-            <span className="badge">{row.id}</span>
+            <div>
+              <h2>{row.model_name || row.model_id || row.id}</h2>
+              <span className="muted">{row.id}</span>
+            </div>
+            <div className="toolbar">
+              <span className="badge">
+                <Box size={13} />
+                {row.source_format || "model"}
+              </span>
+              <a className="btn-ghost" href={buildDownloadUrl({ modelVersionId: row.id, kind: "glb", token: idToken })}>
+                <Download size={15} />
+                GLB
+              </a>
+            </div>
           </div>
           {row.model_description ? <p className="muted">{row.model_description}</p> : null}
           <div className="metrics">

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { Check, Download, Eye, RefreshCw, Trash2, UploadCloud, X } from "lucide-react";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import {
@@ -222,8 +223,23 @@ export function WorkspacePage() {
 
   return (
     <main className="page workspace-page">
-      <h1>Workspace</h1>
-      <p className="muted">Твои модели и действия по версиям.</p>
+      <header className="page-header">
+        <div>
+          <p className="page-kicker">Workspace</p>
+          <h1 className="page-title">Model Operations</h1>
+          <p className="page-subtitle">Твои модели, версии, preview-артефакты и решения по review-пайплайну.</p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="button button-primary" onClick={() => navigate("/workspace/new")}>
+            <UploadCloud size={16} />
+            Add model
+          </button>
+          <button type="button" className="button button-secondary" onClick={refreshModels} disabled={loading}>
+            <RefreshCw size={16} />
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+      </header>
 
       <section className="workspace-dashboard-top">
         <article className="card workspace-user-card">
@@ -237,21 +253,32 @@ export function WorkspacePage() {
         </article>
 
         <article className="card workspace-actions-card">
-          <h2>Actions</h2>
-          <div className="workspace-actions-right">
-            <button type="button" onClick={() => navigate("/workspace/new")}>
-              Add new model
-            </button>
-            <button type="button" onClick={refreshModels} disabled={loading}>
-              {loading ? "Loading..." : "Refresh models"}
-            </button>
-          </div>
+          <h2>Review Controls</h2>
           <label>
             Comment for approve/reject
             <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Опционально" />
           </label>
           <span className="badge">processing: {processingCount}</span>
         </article>
+      </section>
+
+      <section className="metric-strip" aria-label="Workspace metrics">
+        <div className="metric-tile">
+          <span className="metric-label">Total</span>
+          <span className="metric-value">{rows.length}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Ready</span>
+          <span className="metric-value">{rows.filter((r) => r.status === "ready").length}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Processing</span>
+          <span className="metric-value">{processingCount}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Failed</span>
+          <span className="metric-value">{rows.filter((r) => r.status === "failed").length}</span>
+        </div>
       </section>
 
       <section className="card">
@@ -301,29 +328,41 @@ export function WorkspacePage() {
 
                   <div className="workspace-model-actions">
                     <button type="button" onClick={() => refreshOne(r.id)}>
+                      <RefreshCw size={14} />
                       Refresh
                     </button>
                     <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
+                      <Check size={14} />
                       Approve
                     </button>
                     <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
+                      <X size={14} />
                       Reject
                     </button>
                     <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
+                      <Trash2 size={14} />
                       Delete
                     </button>
                     {r.storage_key_glb ? (
                       <button type="button" onClick={() => navigate(`/workspace/render/${r.id}`)}>
+                        <Eye size={14} />
                         Render
                       </button>
                     ) : (
                       <button type="button" disabled>
+                        <Eye size={14} />
                         Render
                       </button>
                     )}
-                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>Original</a>
+                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>
+                      <Download size={14} />
+                      Original
+                    </a>
                     {r.storage_key_glb ? (
-                      <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>GLB</a>
+                      <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>
+                        <Download size={14} />
+                        GLB
+                      </a>
                     ) : (
                       <span className="workspace-link-disabled" aria-disabled="true">
                         GLB

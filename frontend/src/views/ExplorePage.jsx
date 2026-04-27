@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight, RefreshCw, Search, UploadCloud } from "lucide-react";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { withAuthToken } from "../lib/workspaceApi";
@@ -28,6 +29,8 @@ export function ExplorePage() {
   const [nextOffset, setNextOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [idToken, setIdToken] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
@@ -139,25 +142,99 @@ export function ExplorePage() {
       });
   }, [items, idToken, thumbnailInProgressId, thumbnailFailedById, thumbnailsById]);
 
+  const visibleItems = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return items.filter((model) => {
+      if (activeFilter === "ready" && !model.preview_available) return false;
+      if (activeFilter === "glb" && !model.preview_available) return false;
+      if (!["all", "ready", "glb"].includes(activeFilter) && model.source_format !== activeFilter) return false;
+      if (!query) return true;
+      const haystack = [
+        model.model_name,
+        model.model_id,
+        model.id,
+        model.model_description,
+        model.model_category,
+        model.source_format,
+        ...(Array.isArray(model.model_tags) ? model.model_tags : []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [items, activeFilter, searchTerm]);
+
   return (
-    <div className="explore-page">
+    <div className="page page-wide explore-page">
       <section className="explore-hero">
         <div>
-          <h1>Explore CAD Models</h1>
-          <p>Лента готовых моделей. Для рендера, скачивания и загрузки своих файлов войди в аккаунт.</p>
+          <p className="page-kicker">Model library</p>
+          <h1>Explore Models</h1>
+          <p>Готовые модели для просмотра, обмена и проверки рендера. 3D-print профиль оставим как следующий слой продукта.</p>
         </div>
         <div className="explore-hero-actions">
           <Link to="/workspace" className="btn-primary">
             Open Workspace
+            <ArrowRight size={16} />
           </Link>
           <Link to="/auth" className="btn-ghost">
-            Sign in / Sign up
+            Sign in
           </Link>
         </div>
       </section>
 
+      <section className="explore-toolbar">
+        <div className="search-shell">
+          <Search size={17} />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by model, category, tag..."
+            aria-label="Search models"
+          />
+        </div>
+        <div className="filter-row" aria-label="Explore filters">
+          {[
+            ["all", "All"],
+            ["ready", "Ready"],
+            ["step", "STEP"],
+            ["glb", "GLB"],
+            ["3mf", "3MF"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`filter-chip ${activeFilter === value ? "filter-chip-active" : ""}`}
+              onClick={() => setActiveFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="metric-strip" aria-label="Explore metrics">
+        <div className="metric-tile">
+          <span className="metric-label">Visible models</span>
+          <span className="metric-value">{visibleItems.length}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Ready previews</span>
+          <span className="metric-value">{items.filter((model) => model.preview_available).length}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Generated thumbs</span>
+          <span className="metric-value">{Object.keys(thumbnailsById).length}</span>
+        </div>
+        <div className="metric-tile">
+          <span className="metric-label">Page size</span>
+          <span className="metric-value">{PAGE_SIZE}</span>
+        </div>
+      </section>
+
       <section className="explore-grid">
-        {items.map((model, idx) => (
+        {visibleItems.map((model, idx) => (
           <article key={model.id} className="model-card">
             <div className={`model-card-cover model-card-cover-${(idx % 3) + 1}`}>
               {idToken && model.custom_thumbnail_available ? (
@@ -183,6 +260,7 @@ export function ExplorePage() {
                   className="btn-ghost"
                 >
                   {model.preview_available ? "Open render" : "Open workspace"}
+                  <ArrowRight size={15} />
                 </Link>
               </div>
             </div>
@@ -191,14 +269,17 @@ export function ExplorePage() {
       </section>
 
       {!loading && items.length === 0 ? <p className="muted">Пока нет ready-моделей в ленте.</p> : null}
+      {!loading && items.length > 0 && visibleItems.length === 0 ? <p className="muted">По этому фильтру ничего не найдено.</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
       <div className="explore-pager">
         <button type="button" className="btn-ghost" onClick={loadFirstPage} disabled={loading}>
+          <RefreshCw size={15} />
           {loading ? "Loading..." : "Refresh"}
         </button>
         {nextOffset !== null ? (
           <button type="button" className="btn-primary" onClick={loadMore} disabled={loading}>
+            <UploadCloud size={15} />
             {loading ? "Loading..." : "Load more"}
           </button>
         ) : null}

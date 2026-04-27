@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft, UploadCloud } from "lucide-react";
 import { apiUploadModel } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 
@@ -80,8 +81,12 @@ export function WorkspaceUploadPage() {
   return (
     <main className="page workspace-page">
       <section className="card workspace-upload-header">
-        <h1>Upload New Model</h1>
-        <button type="button" onClick={() => navigate("/workspace")}>
+        <div>
+          <p className="page-kicker">New version</p>
+          <h1>Upload Model</h1>
+        </div>
+        <button type="button" className="button button-secondary" onClick={() => navigate("/workspace")}>
+          <ArrowLeft size={16} />
           Back to workspace
         </button>
       </section>
@@ -149,7 +154,8 @@ export function WorkspaceUploadPage() {
         </label>
 
         {!emailVerified ? <p className="muted">Подтверди email, чтобы загружать и изменять данные.</p> : null}
-        <button type="submit" disabled={loading || !emailVerified}>
+        <button type="submit" className="button button-primary" disabled={loading || !emailVerified}>
+          <UploadCloud size={16} />
           {loading ? "Загрузка..." : "Upload"}
         </button>
       </form>
