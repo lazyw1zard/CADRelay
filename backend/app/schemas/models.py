@@ -68,6 +68,11 @@ class ExploreModelListResponse(BaseModel):
     next_offset: int | None = None
 
 
+class SavedModelListResponse(BaseModel):
+    items: list[ExploreModelCardResponse]
+    ids: list[str]
+
+
 class ApprovalDecision(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     comment: str | None = None

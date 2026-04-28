@@ -31,6 +31,7 @@ def init_metadata_store() -> None:
     data = _load_json(settings.metadata_file, default={})
     data.setdefault("model_versions", {})
     data.setdefault("approvals", [])
+    data.setdefault("saved_models", {})
     _write_json(settings.metadata_file, data)
 
 
@@ -90,7 +91,51 @@ def delete_model_version(model_version_id: str) -> dict[str, Any] | None:
 
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     # Добавляем запись о решении клиента в журнал approvals.
-    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": []})
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
     data["approvals"].append(record)
     _write_json(settings.metadata_file, data)
     return record
+
+
+def save_model_for_user(record: dict[str, Any]) -> dict[str, Any]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
+    data.setdefault("saved_models", {})
+    data["saved_models"][record["id"]] = record
+    _write_json(settings.metadata_file, data)
+    return record
+
+
+def unsave_model_for_user(user_id: str, model_version_id: str) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
+    data.setdefault("saved_models", {})
+    removed = data["saved_models"].pop(f"{user_id}:{model_version_id}", None)
+    _write_json(settings.metadata_file, data)
+    return removed
+
+
+def list_saved_model_ids(user_id: str) -> list[str]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
+    saved = list(data.get("saved_models", {}).values())
+    rows = [row for row in saved if row.get("user_id") == user_id]
+    rows.sort(key=lambda row: row.get("saved_at", ""), reverse=True)
+    return [str(row.get("model_version_id")) for row in rows if row.get("model_version_id")]
+
+
+def delete_saved_models_for_model(model_version_id: str) -> int:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
+    saved = data.setdefault("saved_models", {})
+    before = len(saved)
+    data["saved_models"] = {
+        key: row for key, row in saved.items() if row.get("model_version_id") != model_version_id
+    }
+    _write_json(settings.metadata_file, data)
+    return before - len(data["saved_models"])
+
+
+def delete_saved_models_for_user(user_id: str) -> int:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}})
+    saved = data.setdefault("saved_models", {})
+    before = len(saved)
+    data["saved_models"] = {key: row for key, row in saved.items() if row.get("user_id") != user_id}
+    _write_json(settings.metadata_file, data)
+    return before - len(data["saved_models"])

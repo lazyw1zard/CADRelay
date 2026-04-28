@@ -67,3 +67,23 @@ def delete_model_version(model_version_id: str) -> dict[str, Any] | None:
 
 def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     return _backend_module().add_approval(record)
+
+
+def save_model_for_user(record: dict[str, Any]) -> dict[str, Any]:
+    return _backend_module().save_model_for_user(record)
+
+
+def unsave_model_for_user(user_id: str, model_version_id: str) -> dict[str, Any] | None:
+    return _backend_module().unsave_model_for_user(user_id, model_version_id)
+
+
+def list_saved_model_ids(user_id: str) -> list[str]:
+    return _backend_module().list_saved_model_ids(user_id)
+
+
+def delete_saved_models_for_model(model_version_id: str) -> int:
+    return _backend_module().delete_saved_models_for_model(model_version_id)
+
+
+def delete_saved_models_for_user(user_id: str) -> int:
+    return _backend_module().delete_saved_models_for_user(user_id)

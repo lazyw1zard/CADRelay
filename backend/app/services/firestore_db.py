@@ -86,3 +86,48 @@ def add_approval(record: dict[str, Any]) -> dict[str, Any]:
     client = _get_client()
     client.collection("approvals").add(record)
     return record
+
+
+def save_model_for_user(record: dict[str, Any]) -> dict[str, Any]:
+    client = _get_client()
+    client.collection("saved_models").document(record["id"]).set(record)
+    return record
+
+
+def unsave_model_for_user(user_id: str, model_version_id: str) -> dict[str, Any] | None:
+    client = _get_client()
+    ref = client.collection("saved_models").document(f"{user_id}:{model_version_id}")
+    doc = ref.get()
+    if not doc.exists:
+        return None
+    removed = doc.to_dict()
+    ref.delete()
+    return removed
+
+
+def list_saved_model_ids(user_id: str) -> list[str]:
+    client = _get_client()
+    docs = client.collection("saved_models").where("user_id", "==", user_id).stream()
+    rows = [doc.to_dict() for doc in docs if doc.exists]
+    rows.sort(key=lambda row: row.get("saved_at", ""), reverse=True)
+    return [str(row.get("model_version_id")) for row in rows if row.get("model_version_id")]
+
+
+def delete_saved_models_for_model(model_version_id: str) -> int:
+    client = _get_client()
+    docs = client.collection("saved_models").where("model_version_id", "==", model_version_id).stream()
+    removed = 0
+    for doc in docs:
+        doc.reference.delete()
+        removed += 1
+    return removed
+
+
+def delete_saved_models_for_user(user_id: str) -> int:
+    client = _get_client()
+    docs = client.collection("saved_models").where("user_id", "==", user_id).stream()
+    removed = 0
+    for doc in docs:
+        doc.reference.delete()
+        removed += 1
+    return removed

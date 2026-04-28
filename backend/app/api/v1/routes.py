@@ -19,6 +19,7 @@ from app.schemas.models import (
     ExploreModelListResponse,
     ModelVersionCreate,
     ModelVersionResponse,
+    SavedModelListResponse,
     UploadResponse,
 )
 from app.services.firebase_auth_admin import delete_auth_user, list_auth_users, set_auth_user_role
@@ -26,8 +27,13 @@ from app.services.metadata_store import (
     add_approval,
     create_model_version,
     delete_model_version,
+    delete_saved_models_for_model,
+    delete_saved_models_for_user,
     get_model_version,
+    list_saved_model_ids,
     list_model_versions,
+    save_model_for_user,
+    unsave_model_for_user,
     update_model_version,
 )
 from app.services.queue import enqueue_conversion, remove_messages_for_model
@@ -109,6 +115,24 @@ def _parse_tags(raw: str | None) -> list[str]:
         if len(result) >= 12:
             break
     return result
+
+
+def _to_explore_card(row: dict) -> ExploreModelCardResponse:
+    return ExploreModelCardResponse(
+        id=row["id"],
+        model_id=row["model_id"],
+        model_name=row.get("model_name"),
+        model_description=row.get("model_description"),
+        model_category=row.get("model_category"),
+        model_tags=row.get("model_tags") or [],
+        source_format=row["source_format"],
+        conversion_profile=row.get("conversion_profile"),
+        status=row["status"],
+        owner_user_id=row.get("owner_user_id"),
+        created_at=row.get("created_at"),
+        preview_available=bool(row.get("storage_key_glb")),
+        custom_thumbnail_available=bool(row.get("storage_key_thumbnail_custom")),
+    )
 
 
 def _is_supported_thumbnail(upload: UploadFile) -> bool:
@@ -339,26 +363,66 @@ def list_explore_model_versions_endpoint(
     has_more = len(rows) > limit
     page_rows = rows[:limit]
 
-    items = [
-        ExploreModelCardResponse(
-            id=row["id"],
-            model_id=row.get("model_id") or row["id"],
-            model_name=row.get("model_name"),
-            model_description=row.get("model_description"),
-            model_category=row.get("model_category"),
-            model_tags=row.get("model_tags") or [],
-            source_format=row.get("source_format") or "step",
-            conversion_profile=row.get("conversion_profile"),
-            status=row.get("status") or "ready",
-            owner_user_id=row.get("owner_user_id"),
-            created_at=row.get("created_at"),
-            preview_available=bool(row.get("storage_key_glb")),
-            custom_thumbnail_available=bool(row.get("storage_key_thumbnail_custom")),
-        )
-        for row in page_rows
-    ]
+    items = [_to_explore_card(row) for row in page_rows]
     next_offset = offset + limit if has_more else None
     return ExploreModelListResponse(items=items, next_offset=next_offset)
+
+
+@router.get("/me/saved-models", response_model=SavedModelListResponse)
+def list_saved_models_endpoint(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SavedModelListResponse:
+    _ensure_role(current_user, ROLE_VIEW)
+    saved_ids = list_saved_model_ids(current_user.user_id)
+    items: list[ExploreModelCardResponse] = []
+    visible_ids: list[str] = []
+    stale_ids: list[str] = []
+    for model_version_id in saved_ids:
+        record = get_model_version(model_version_id)
+        if record is None:
+            stale_ids.append(model_version_id)
+            continue
+        try:
+            _ensure_can_read_access(record, current_user)
+        except HTTPException:
+            continue
+        items.append(_to_explore_card(record))
+        visible_ids.append(model_version_id)
+    for model_version_id in stale_ids:
+        unsave_model_for_user(current_user.user_id, model_version_id)
+    return SavedModelListResponse(items=items, ids=visible_ids)
+
+
+@router.put("/me/saved-models/{model_version_id}", response_model=SavedModelListResponse)
+def save_model_endpoint(
+    model_version_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SavedModelListResponse:
+    _ensure_role(current_user, ROLE_VIEW)
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_read_access(record, current_user)
+    now = datetime.now(UTC).isoformat()
+    save_model_for_user(
+        {
+            "id": f"{current_user.user_id}:{model_version_id}",
+            "user_id": current_user.user_id,
+            "model_version_id": model_version_id,
+            "saved_at": now,
+        }
+    )
+    return list_saved_models_endpoint(current_user=current_user)
+
+
+@router.delete("/me/saved-models/{model_version_id}", response_model=SavedModelListResponse)
+def unsave_model_endpoint(
+    model_version_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> SavedModelListResponse:
+    _ensure_role(current_user, ROLE_VIEW)
+    unsave_model_for_user(current_user.user_id, model_version_id)
+    return list_saved_models_endpoint(current_user=current_user)
 
 
 def _ensure_can_access(record: dict, current_user: CurrentUser) -> None:
@@ -402,6 +466,7 @@ def _delete_model_version_with_artifacts(record: dict) -> bool:
             # Если файла уже нет - не блокируем удаление карточки модели.
             pass
 
+    delete_saved_models_for_model(model_version_id)
     return delete_model_version(model_version_id) is not None
 
 
@@ -450,6 +515,8 @@ def delete_current_user_endpoint(
         for record in owned_rows:
             if _delete_model_version_with_artifacts(record):
                 deleted_models += 1
+
+    delete_saved_models_for_user(current_user.user_id)
 
     if settings.auth_mode == "firebase":
         try:
