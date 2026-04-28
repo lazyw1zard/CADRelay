@@ -617,6 +617,11 @@ textarea:disabled {
   border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
 }
 
+.card-favorite-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .model-card-body h3,
 .workspace-model-main h3 {
   padding-right: 38px;
@@ -1082,6 +1087,46 @@ textarea {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
+.workspace-library-section {
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-section-heading {
+  align-items: flex-start;
+}
+
+.workspace-section-heading h2 {
+  margin: 0;
+}
+
+.workspace-favorites-section {
+  border-color: color-mix(in srgb, var(--brand) 18%, var(--line));
+}
+
+.workspace-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  border: 1px dashed color-mix(in srgb, var(--brand) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand-soft) 32%, transparent);
+  padding: 14px;
+}
+
+.workspace-empty-state p {
+  flex: 1;
+}
+
+.workspace-empty-state .button {
+  flex: 0 0 auto;
+}
+
+.workspace-favorite-card {
+  border-color: color-mix(in srgb, var(--brand) 16%, var(--line));
+}
+
 .workspace-model-thumb-btn {
   border: 0;
   border-bottom: 1px solid var(--workspace-line);
@@ -1168,6 +1213,12 @@ textarea {
   font-size: 13px;
   font-weight: 680;
   border: 1px solid var(--workspace-line);
+}
+
+.workspace-model-actions .workspace-action-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--workspace-line));
+  background: color-mix(in srgb, var(--danger-soft) 58%, var(--surface));
 }
 
 .workspace-link-disabled {
@@ -1442,6 +1493,11 @@ textarea {
 
   .workspace-model-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-empty-state {
+    display: grid;
+    justify-items: start;
   }
 
   .viewer-canvas {

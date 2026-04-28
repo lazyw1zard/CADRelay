@@ -22,7 +22,7 @@ function getUserInitial(authUser) {
 export function WorkspacePage() {
   const navigate = useNavigate();
   const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
-  const { favorites, removeFavorite } = useFavorites(authUser?.uid);
+  const { favorites, removeFavorite, loadFavorites, loadingFavorites, favoritesError } = useFavorites(authUser?.uid, idToken);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -112,10 +112,11 @@ export function WorkspacePage() {
   useEffect(() => {
     // Генерируем миниатюры только для ready-моделей с GLB.
     if (!authUser || !idToken || thumbnailInProgressId) return;
-    const next = rows.find(
+    const previewRows = [...favorites, ...rows];
+    const next = previewRows.find(
       (r) =>
         !r.storage_key_thumbnail_custom &&
-        r.storage_key_glb &&
+        (r.storage_key_glb || r.preview_available) &&
         !thumbnailsById[r.id] &&
         !thumbnailFailedById[r.id]
     );
@@ -135,7 +136,7 @@ export function WorkspacePage() {
       .finally(() => {
         if (isMountedRef.current) setThumbnailInProgressId("");
       });
-  }, [rows, thumbnailsById, thumbnailFailedById, thumbnailInProgressId, authUser, idToken]);
+  }, [rows, favorites, thumbnailsById, thumbnailFailedById, thumbnailInProgressId, authUser, idToken]);
 
   const processingCount = useMemo(
     () => rows.filter((r) => r.status === "processing" || r.status === "uploaded").length,
@@ -225,7 +226,6 @@ export function WorkspacePage() {
       await apiDeleteCurrentAccount(idToken);
       try {
         localStorage.removeItem("cadrelay_thumbnails");
-        localStorage.removeItem(`cadrelay_favorites:${authUser.uid}`);
       } catch {
         // localStorage cleanup is best-effort.
       }
@@ -375,21 +375,36 @@ export function WorkspacePage() {
         </div>
       </section>
 
-      <section className="card">
-        <div className="row">
-          <h2>Избранные модели</h2>
-          <span className="muted">{favorites.length} items</span>
+      <section className="card workspace-library-section workspace-favorites-section">
+        <div className="row workspace-section-heading">
+          <div>
+            <p className="page-kicker">Saved</p>
+            <h2>Избранное</h2>
+          </div>
+          <div className="toolbar">
+            <span className="badge">{loadingFavorites ? "loading" : `${favorites.length}`}</span>
+            <button type="button" className="btn-ghost" onClick={loadFavorites} disabled={loadingFavorites}>
+              <RefreshCw size={14} />
+              Обновить
+            </button>
+          </div>
         </div>
 
-        {favorites.length === 0 ? (
-          <p className="muted">Сохраняй модели из Explore, чтобы быстро возвращаться к ним здесь.</p>
+        {!loadingFavorites && favorites.length === 0 ? (
+          <div className="workspace-empty-state">
+            <Star size={18} />
+            <p className="muted">Пока пусто. Отмеченные модели появятся здесь после сохранения в Explore.</p>
+            <button type="button" className="button button-secondary" onClick={() => navigate("/")}>
+              Перейти в Explore
+            </button>
+          </div>
         ) : (
           <div className="workspace-model-grid">
-            {favorites.map((model) => (
-              <article key={model.id} className="model-card workspace-model-card">
+            {favorites.map((model, idx) => (
+              <article key={model.id} className="model-card workspace-model-card workspace-favorite-card">
                 <button
                   type="button"
-                  className="model-card-cover workspace-model-thumb-btn"
+                  className={`model-card-cover workspace-model-thumb-btn model-card-cover-${(idx % 3) + 1}`}
                   onClick={() => model.preview_available && navigate(`/workspace/render/${model.id}`)}
                   disabled={!model.preview_available}
                   title={model.preview_available ? "Смотреть в 3D" : "GLB пока не готов"}
@@ -400,6 +415,10 @@ export function WorkspacePage() {
                       src={buildDownloadUrl({ modelVersionId: model.id, kind: "thumbnail", token: idToken })}
                       alt={`${model.model_name || model.model_id || model.id} thumbnail`}
                     />
+                  ) : thumbnailsById[model.id] ? (
+                    <img className="model-card-cover-img" src={thumbnailsById[model.id]} alt={`${model.id} thumbnail`} />
+                  ) : thumbnailInProgressId === model.id ? (
+                    <span className="workspace-thumb-placeholder muted">...</span>
                   ) : (
                     <span className="workspace-thumb-placeholder muted">{(model.source_format || "cad").toUpperCase()}</span>
                   )}
@@ -436,7 +455,7 @@ export function WorkspacePage() {
                         Оригинал
                       </a>
                     ) : null}
-                    <button type="button" onClick={() => removeFavorite(model.id)}>
+                    <button type="button" className="workspace-action-danger" onClick={() => removeFavorite(model.id)}>
                       <Star size={14} fill="currentColor" />
                       Убрать
                     </button>
@@ -450,7 +469,7 @@ export function WorkspacePage() {
 
       <section className="card">
         <div className="row">
-          <h2>My uploaded models</h2>
+          <h2>Мои модели</h2>
           <span className="muted">{rows.length} items</span>
         </div>
 
@@ -545,6 +564,7 @@ export function WorkspacePage() {
 
       {authError ? <p className="error">{authError}</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {favoritesError ? <p className="error">{favoritesError}</p> : null}
     </main>
   );
 }

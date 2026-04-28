@@ -49,7 +49,7 @@ export function ExplorePage() {
   const isMountedRef = useRef(true);
   const firebaseReady = getFirebaseConfigStatus();
   const selectedModelId = searchParams.get("model") || "";
-  const { isFavorite, toggleFavorite } = useFavorites(authUser?.uid);
+  const { isFavorite, toggleFavorite, favoritesError } = useFavorites(authUser?.uid, idToken);
 
   async function loadFirstPage() {
     setLoading(true);
@@ -285,12 +285,14 @@ export function ExplorePage() {
               <button
                 type="button"
                 className="card-favorite-btn"
+                aria-disabled={!idToken}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!idToken) return;
                   toggleFavorite(model);
                 }}
-                aria-label={isFavorite(model.id) ? "Remove from favorites" : "Add to favorites"}
-                title={isFavorite(model.id) ? "Remove from favorites" : "Add to favorites"}
+                aria-label={isFavorite(model.id) ? "Убрать из избранного" : "Добавить в избранное"}
+                title={!idToken ? "Войди, чтобы сохранять модели" : isFavorite(model.id) ? "Убрать из избранного" : "Добавить в избранное"}
               >
                 <Star size={16} fill={isFavorite(model.id) ? "currentColor" : "none"} />
               </button>
@@ -321,6 +323,7 @@ export function ExplorePage() {
       {!loading && items.length === 0 ? <p className="muted">Пока нет ready-моделей в ленте.</p> : null}
       {!loading && items.length > 0 && visibleItems.length === 0 ? <p className="muted">По этому фильтру ничего не найдено.</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {favoritesError ? <p className="error">{favoritesError}</p> : null}
 
       <div className="explore-pager">
         <button type="button" className="btn-ghost" onClick={loadFirstPage} disabled={loading}>

@@ -53,9 +53,10 @@
 - [x] Add local MVP favorites in workspace:
   - saved models are stored in `localStorage` by Firebase UID
   - favorites are visible in Workspace
-- [ ] Add backend-backed user collections:
+- [x] Add backend-backed user collections:
   - liked models
   - favorites/saved models across devices
+- [ ] Add like counters and public saved/like aggregates after saved model relations settle.
 - [ ] Add robust empty/error/loading states (no raw backend error text in final UX).
 - [ ] Ensure responsive behavior for desktop/mobile and basic accessibility (focus states, keyboard navigation, labels).
 - [x] Add subtle motion for transitions/loading without impacting performance.

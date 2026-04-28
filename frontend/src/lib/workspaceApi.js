@@ -82,6 +82,21 @@ export async function apiDeleteCurrentAccount(token) {
   return resp.json();
 }
 
+export async function apiListSavedModels(token) {
+  const resp = await apiFetch("/me/saved-models", { token });
+  return resp.json();
+}
+
+export async function apiSaveModel(modelVersionId, token) {
+  const resp = await apiFetch(`/me/saved-models/${modelVersionId}`, { token, method: "PUT" });
+  return resp.json();
+}
+
+export async function apiUnsaveModel(modelVersionId, token) {
+  const resp = await apiFetch(`/me/saved-models/${modelVersionId}`, { token, method: "DELETE" });
+  return resp.json();
+}
+
 export async function apiAdminListUsers({ token, limit = 50, pageToken = "" }) {
   const qs = new URLSearchParams();
   qs.set("limit", String(limit));
