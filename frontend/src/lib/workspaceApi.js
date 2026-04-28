@@ -58,6 +58,11 @@ export async function apiUploadModel({
   return resp.json();
 }
 
+export async function apiListModelCategories() {
+  const resp = await apiFetch("/model-categories");
+  return resp.json();
+}
+
 export async function apiApproveModelVersion({ modelVersionId, decision, comment, actorUserId, token }) {
   const resp = await apiFetch(`/model-versions/${modelVersionId}/approval`, {
     token,
@@ -112,6 +117,26 @@ export async function apiAdminSetUserRole({ token, uid, role }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role }),
   });
+  return resp.json();
+}
+
+export async function apiAdminListModelCategories({ token }) {
+  const resp = await apiFetch("/admin/model-categories", { token });
+  return resp.json();
+}
+
+export async function apiAdminCreateModelCategory({ token, label }) {
+  const resp = await apiFetch("/admin/model-categories", {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+  return resp.json();
+}
+
+export async function apiAdminDeleteModelCategory({ token, categoryId }) {
+  const resp = await apiFetch(`/admin/model-categories/${categoryId}`, { token, method: "DELETE" });
   return resp.json();
 }
 

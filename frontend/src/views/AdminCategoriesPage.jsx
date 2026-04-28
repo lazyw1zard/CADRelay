@@ -1,0 +1,170 @@
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
+import {
+  apiAdminCreateModelCategory,
+  apiAdminDeleteModelCategory,
+  apiAdminListModelCategories,
+} from "../lib/workspaceApi";
+
+export function AdminCategoriesPage() {
+  const navigate = useNavigate();
+  const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
+  const [categories, setCategories] = useState([]);
+  const [labelDraft, setLabelDraft] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadCategories() {
+    if (!idToken) return;
+    setLoading(true);
+    setError("");
+    try {
+      const rows = await apiAdminListModelCategories({ token: idToken });
+      setCategories(Array.isArray(rows) ? rows : []);
+    } catch (err) {
+      setError(String(err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addCategory(e) {
+    e.preventDefault();
+    const label = labelDraft.trim();
+    if (!label) return;
+    setSaving(true);
+    setError("");
+    try {
+      await apiAdminCreateModelCategory({ token: idToken, label });
+      setLabelDraft("");
+      await loadCategories();
+    } catch (err) {
+      setError(String(err?.message || err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeCategory(categoryId) {
+    setSaving(true);
+    setError("");
+    try {
+      await apiAdminDeleteModelCategory({ token: idToken, categoryId });
+      await loadCategories();
+    } catch (err) {
+      setError(String(err?.message || err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!authReady || !authUser || authRole !== "admin") return;
+    loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, authUser, authRole, idToken]);
+
+  if (!firebaseReady) {
+    return (
+      <main className="page workspace-page">
+        <section className="card">
+          <h2>Категории</h2>
+          <p className="error">Firebase config не найден. Добавь VITE_FIREBASE_* в frontend/.env.local.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authReady) {
+    return (
+      <main className="page workspace-page">
+        <section className="card">
+          <p className="muted">Проверяем вход...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!authUser) return <Navigate to="/auth" replace />;
+
+  if (authRole !== "admin") {
+    return (
+      <main className="page workspace-page">
+        <section className="card">
+          <h2>Категории</h2>
+          <p className="muted">Доступ разрешен только для роли admin.</p>
+          <button type="button" onClick={() => navigate("/workspace")}>
+            Назад в workspace
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page workspace-page admin-users-page">
+      <section className="card workspace-upload-header">
+        <div>
+          <p className="page-kicker">Administration</p>
+          <h1>Категории моделей</h1>
+        </div>
+        <div className="workspace-actions-right">
+          <button type="button" onClick={() => navigate("/workspace")}>
+            <ArrowLeft size={16} />
+            Назад в workspace
+          </button>
+          <button type="button" onClick={loadCategories} disabled={loading || !emailVerified}>
+            <RefreshCw size={16} />
+            {loading ? "Загрузка..." : "Обновить"}
+          </button>
+        </div>
+      </section>
+
+      {!emailVerified ? <p className="muted">Подтверди email, чтобы управлять категориями.</p> : null}
+
+      <section className="card admin-category-panel">
+        <form className="admin-category-form" onSubmit={addCategory}>
+          <label>
+            Новая категория
+            <input value={labelDraft} onChange={(e) => setLabelDraft(e.target.value)} placeholder="Например: Fixtures" />
+          </label>
+          <button type="submit" className="button button-primary" disabled={saving || !emailVerified || !labelDraft.trim()}>
+            <Plus size={15} />
+            Добавить
+          </button>
+        </form>
+
+        {categories.length === 0 ? (
+          <p className="muted">Категории пока не загружены.</p>
+        ) : (
+          <div className="admin-category-list">
+            {categories.map((category) => (
+              <div key={category.id} className={`admin-category-row ${category.active ? "" : "admin-category-disabled"}`}>
+                <div>
+                  <strong>{category.label}</strong>
+                  <span className="muted">{category.active ? "active" : "hidden"}</span>
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => removeCategory(category.id)}
+                  disabled={saving || !emailVerified || !category.active}
+                  title="Скрыть категорию"
+                  aria-label={`Скрыть категорию ${category.label}`}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {authError ? <p className="error">{authError}</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+    </main>
+  );
+}

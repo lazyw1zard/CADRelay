@@ -6,6 +6,26 @@ from typing import Any
 
 from app.core.config import settings
 
+DEFAULT_CATEGORIES = ["Kitchen", "Games", "Tools", "Mechanical", "Electronics", "Decor", "Hobby", "Other"]
+
+
+def _category_id(label: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in label.strip())
+    compact = "-".join(part for part in cleaned.split("-") if part)
+    return compact[:64] or "category"
+
+
+def _default_categories() -> dict[str, dict[str, Any]]:
+    return {
+        _category_id(label): {
+            "id": _category_id(label),
+            "label": label,
+            "active": True,
+            "sort_order": index * 10,
+        }
+        for index, label in enumerate(DEFAULT_CATEGORIES)
+    }
+
 
 def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,6 +52,8 @@ def init_metadata_store() -> None:
     data.setdefault("model_versions", {})
     data.setdefault("approvals", [])
     data.setdefault("saved_models", {})
+    if "categories" not in data:
+        data["categories"] = _default_categories()
     _write_json(settings.metadata_file, data)
 
 
@@ -139,3 +161,44 @@ def delete_saved_models_for_user(user_id: str) -> int:
     data["saved_models"] = {key: row for key, row in saved.items() if row.get("user_id") != user_id}
     _write_json(settings.metadata_file, data)
     return before - len(data["saved_models"])
+
+
+def list_model_categories(active_only: bool = True) -> list[dict[str, Any]]:
+    data = _load_json(settings.metadata_file, default={"categories": _default_categories()})
+    categories = list(data.get("categories", {}).values())
+    if active_only:
+        categories = [row for row in categories if row.get("active", True)]
+    categories.sort(key=lambda row: (int(row.get("sort_order") or 100), str(row.get("label") or "")))
+    return categories
+
+
+def create_model_category(label: str) -> dict[str, Any]:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}, "categories": {}})
+    data.setdefault("categories", {})
+    category_id = _category_id(label)
+    existing = data["categories"].get(category_id)
+    if existing:
+        existing["label"] = label.strip()
+        existing["active"] = True
+        data["categories"][category_id] = existing
+    else:
+        data["categories"][category_id] = {
+            "id": category_id,
+            "label": label.strip(),
+            "active": True,
+            "sort_order": len(data["categories"]) * 10,
+        }
+    _write_json(settings.metadata_file, data)
+    return data["categories"][category_id]
+
+
+def delete_model_category(category_id: str) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}, "categories": {}})
+    data.setdefault("categories", {})
+    current = data["categories"].get(category_id)
+    if current is None:
+        return None
+    current["active"] = False
+    data["categories"][category_id] = current
+    _write_json(settings.metadata_file, data)
+    return current

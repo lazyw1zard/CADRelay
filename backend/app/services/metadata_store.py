@@ -87,3 +87,15 @@ def delete_saved_models_for_model(model_version_id: str) -> int:
 
 def delete_saved_models_for_user(user_id: str) -> int:
     return _backend_module().delete_saved_models_for_user(user_id)
+
+
+def list_model_categories(active_only: bool = True) -> list[dict[str, Any]]:
+    return _backend_module().list_model_categories(active_only=active_only)
+
+
+def create_model_category(label: str) -> dict[str, Any]:
+    return _backend_module().create_model_category(label)
+
+
+def delete_model_category(category_id: str) -> dict[str, Any] | None:
+    return _backend_module().delete_model_category(category_id)

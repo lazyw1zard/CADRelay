@@ -7,6 +7,13 @@ from google.cloud import firestore
 from app.core.config import settings
 
 _client: firestore.Client | None = None
+DEFAULT_CATEGORIES = ["Kitchen", "Games", "Tools", "Mechanical", "Electronics", "Decor", "Hobby", "Other"]
+
+
+def _category_id(label: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in label.strip())
+    compact = "-".join(part for part in cleaned.split("-") if part)
+    return compact[:64] or "category"
 
 
 def _get_client() -> firestore.Client:
@@ -19,8 +26,19 @@ def _get_client() -> firestore.Client:
 
 
 def init_metadata_store() -> None:
-    # Firestore is schema-less; no file initialization needed.
-    _get_client()
+    # Firestore is schema-less, but MVP category defaults make upload dropdown usable.
+    client = _get_client()
+    if not list(client.collection("categories").limit(1).stream()):
+        for index, label in enumerate(DEFAULT_CATEGORIES):
+            category_id = _category_id(label)
+            client.collection("categories").document(category_id).set(
+                {
+                    "id": category_id,
+                    "label": label,
+                    "active": True,
+                    "sort_order": index * 10,
+                }
+            )
 
 
 def create_model_version(record: dict[str, Any]) -> dict[str, Any]:
@@ -131,3 +149,45 @@ def delete_saved_models_for_user(user_id: str) -> int:
         doc.reference.delete()
         removed += 1
     return removed
+
+
+def list_model_categories(active_only: bool = True) -> list[dict[str, Any]]:
+    client = _get_client()
+    docs = client.collection("categories").stream()
+    rows = [doc.to_dict() for doc in docs if doc.exists]
+    if active_only:
+        rows = [row for row in rows if row.get("active", True)]
+    rows.sort(key=lambda row: (int(row.get("sort_order") or 100), str(row.get("label") or "")))
+    return rows
+
+
+def create_model_category(label: str) -> dict[str, Any]:
+    client = _get_client()
+    category_id = _category_id(label)
+    ref = client.collection("categories").document(category_id)
+    doc = ref.get()
+    record = doc.to_dict() if doc.exists else None
+    if record:
+        record["label"] = label.strip()
+        record["active"] = True
+    else:
+        record = {
+            "id": category_id,
+            "label": label.strip(),
+            "active": True,
+            "sort_order": len(list(client.collection("categories").stream())) * 10,
+        }
+    ref.set(record)
+    return record
+
+
+def delete_model_category(category_id: str) -> dict[str, Any] | None:
+    client = _get_client()
+    ref = client.collection("categories").document(category_id)
+    doc = ref.get()
+    if not doc.exists:
+        return None
+    record = doc.to_dict()
+    record["active"] = False
+    ref.set(record)
+    return record

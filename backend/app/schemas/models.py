@@ -73,6 +73,18 @@ class SavedModelListResponse(BaseModel):
     ids: list[str]
 
 
+class ModelCategoryCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=64)
+
+
+class ModelCategoryResponse(BaseModel):
+    id: str
+    label: str
+    active: bool = True
+    sort_order: int = 100
+    created_at: str | None = None
+
+
 class ApprovalDecision(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     comment: str | None = None

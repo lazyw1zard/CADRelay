@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, UploadCloud } from "lucide-react";
-import { apiUploadModel } from "../lib/workspaceApi";
+import { apiListModelCategories, apiUploadModel } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 
 export function WorkspaceUploadPage() {
@@ -10,6 +10,7 @@ export function WorkspaceUploadPage() {
   const [modelName, setModelName] = useState("");
   const [modelDescription, setModelDescription] = useState("");
   const [modelCategory, setModelCategory] = useState("");
+  const [categories, setCategories] = useState([]);
   const [modelTags, setModelTags] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [sourceFormat, setSourceFormat] = useState("step");
@@ -17,6 +18,26 @@ export function WorkspaceUploadPage() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCategories() {
+      try {
+        const rows = await apiListModelCategories();
+        if (!cancelled) {
+          const incoming = Array.isArray(rows) ? rows : [];
+          setCategories(incoming);
+          if (!modelCategory && incoming[0]?.label) setModelCategory(incoming[0].label);
+        }
+      } catch {
+        // Category list is a convenience; upload can still proceed with empty category.
+      }
+    }
+    loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleUpload(e) {
     e.preventDefault();
@@ -113,7 +134,14 @@ export function WorkspaceUploadPage() {
 
         <label>
           Category
-          <input value={modelCategory} onChange={(e) => setModelCategory(e.target.value)} placeholder="Tools" />
+          <select value={modelCategory} onChange={(e) => setModelCategory(e.target.value)}>
+            <option value="">Без категории</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.label}>
+                {category.label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>

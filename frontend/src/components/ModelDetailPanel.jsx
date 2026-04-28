@@ -118,7 +118,11 @@ export function ModelDetailPanel({
         ) : null}
 
         <footer className="detail-actions">
-          <button type="button" className="button button-secondary" onClick={onToggleFavorite}>
+          <button
+            type="button"
+            className={`button button-secondary detail-favorite-btn ${isFavorite ? "favorite-active" : ""}`}
+            onClick={onToggleFavorite}
+          >
             <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
             {isFavorite ? "В избранном" : "В избранное"}
           </button>

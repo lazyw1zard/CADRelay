@@ -5,7 +5,7 @@ import { ModelDetailPanel } from "../components/ModelDetailPanel";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
-import { withAuthToken } from "../lib/workspaceApi";
+import { apiListModelCategories, withAuthToken } from "../lib/workspaceApi";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 const PAGE_SIZE = 12;
@@ -34,6 +34,9 @@ export function ExplorePage() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [displayedItems, setDisplayedItems] = useState([]);
+  const [filterMotion, setFilterMotion] = useState("");
+  const [categories, setCategories] = useState([]);
   const [authUser, setAuthUser] = useState(null);
   const [idToken, setIdToken] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
@@ -84,6 +87,22 @@ export function ExplorePage() {
   useEffect(() => {
     // На входе в Explore тянем первую страницу живых ready-моделей.
     loadFirstPage();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCategories() {
+      try {
+        const rows = await apiListModelCategories();
+        if (!cancelled) setCategories(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    }
+    loadCategories();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -153,9 +172,19 @@ export function ExplorePage() {
   const visibleItems = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return items.filter((model) => {
+      if (activeFilter.startsWith("category:")) {
+        const selectedCategory = activeFilter.slice("category:".length).toLowerCase();
+        if (String(model.model_category || "").toLowerCase() !== selectedCategory) return false;
+      }
       if (activeFilter === "ready" && !model.preview_available) return false;
       if (activeFilter === "glb" && !model.preview_available) return false;
-      if (!["all", "ready", "glb"].includes(activeFilter) && model.source_format !== activeFilter) return false;
+      if (
+        !activeFilter.startsWith("category:") &&
+        !["all", "ready", "glb"].includes(activeFilter) &&
+        model.source_format !== activeFilter
+      ) {
+        return false;
+      }
       if (!query) return true;
       const haystack = [
         model.model_name,
@@ -172,6 +201,25 @@ export function ExplorePage() {
       return haystack.includes(query);
     });
   }, [items, activeFilter, searchTerm]);
+
+  useEffect(() => {
+    const currentIds = displayedItems.map((model) => model.id).join("|");
+    const nextIds = visibleItems.map((model) => model.id).join("|");
+    if (currentIds === nextIds) return undefined;
+
+    let enterTimer;
+    setFilterMotion("leave");
+    const swapTimer = window.setTimeout(() => {
+      setDisplayedItems(visibleItems);
+      setFilterMotion("enter");
+      enterTimer = window.setTimeout(() => setFilterMotion(""), 220);
+    }, 120);
+
+    return () => {
+      window.clearTimeout(swapTimer);
+      if (enterTimer) window.clearTimeout(enterTimer);
+    };
+  }, [displayedItems, visibleItems]);
 
   const selectedModel = useMemo(
     () => items.find((model) => model.id === selectedModelId) || null,
@@ -233,6 +281,19 @@ export function ExplorePage() {
               {label}
             </button>
           ))}
+          {categories.map((category) => {
+            const value = `category:${category.label}`;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                className={`filter-chip ${activeFilter === value ? "filter-chip-active" : ""}`}
+                onClick={() => setActiveFilter(value)}
+              >
+                {category.label}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -255,8 +316,8 @@ export function ExplorePage() {
         </div>
       </section>
 
-      <section className="explore-grid">
-        {visibleItems.map((model, idx) => (
+      <section className={`explore-grid ${filterMotion ? `explore-grid-filter-${filterMotion}` : ""}`}>
+        {displayedItems.map((model, idx) => (
           <article
             key={model.id}
             className="model-card model-card-clickable"
@@ -284,7 +345,7 @@ export function ExplorePage() {
             <div className="model-card-body">
               <button
                 type="button"
-                className="card-favorite-btn"
+                className={`card-favorite-btn ${isFavorite(model.id) ? "card-favorite-active" : ""}`}
                 aria-disabled={!idToken}
                 onClick={(e) => {
                   e.stopPropagation();

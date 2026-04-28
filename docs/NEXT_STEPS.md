@@ -57,6 +57,14 @@
   - liked models
   - favorites/saved models across devices
 - [ ] Add like counters and public saved/like aggregates after saved model relations settle.
+- [x] Add managed model categories:
+  - admin-managed category list
+  - category dropdown during upload instead of free text
+  - category filters in Explore
+- [ ] Add category ordering and richer taxonomy:
+  - admin sort order controls
+  - optional icons/descriptions
+  - edit-category flow for existing models
 - [ ] Add robust empty/error/loading states (no raw backend error text in final UX).
 - [ ] Ensure responsive behavior for desktop/mobile and basic accessibility (focus states, keyboard navigation, labels).
 - [x] Add subtle motion for transitions/loading without impacting performance.

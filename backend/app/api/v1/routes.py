@@ -17,6 +17,8 @@ from app.schemas.models import (
     ApprovalDecision,
     ExploreModelCardResponse,
     ExploreModelListResponse,
+    ModelCategoryCreate,
+    ModelCategoryResponse,
     ModelVersionCreate,
     ModelVersionResponse,
     SavedModelListResponse,
@@ -26,10 +28,13 @@ from app.services.firebase_auth_admin import delete_auth_user, list_auth_users, 
 from app.services.metadata_store import (
     add_approval,
     create_model_version,
+    create_model_category,
     delete_model_version,
+    delete_model_category,
     delete_saved_models_for_model,
     delete_saved_models_for_user,
     get_model_version,
+    list_model_categories,
     list_saved_model_ids,
     list_model_versions,
     save_model_for_user,
@@ -366,6 +371,47 @@ def list_explore_model_versions_endpoint(
     items = [_to_explore_card(row) for row in page_rows]
     next_offset = offset + limit if has_more else None
     return ExploreModelListResponse(items=items, next_offset=next_offset)
+
+
+@router.get("/model-categories", response_model=list[ModelCategoryResponse])
+def list_model_categories_endpoint() -> list[ModelCategoryResponse]:
+    rows = list_model_categories(active_only=True)
+    return [ModelCategoryResponse(**row) for row in rows]
+
+
+@router.get("/admin/model-categories", response_model=list[ModelCategoryResponse])
+def admin_list_model_categories_endpoint(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> list[ModelCategoryResponse]:
+    _ensure_role(current_user, ROLE_ADMIN)
+    rows = list_model_categories(active_only=False)
+    return [ModelCategoryResponse(**row) for row in rows]
+
+
+@router.post("/admin/model-categories", response_model=ModelCategoryResponse)
+def admin_create_model_category_endpoint(
+    payload: ModelCategoryCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelCategoryResponse:
+    _ensure_role(current_user, ROLE_ADMIN)
+    _ensure_email_verified(current_user)
+    label = _normalize_text(payload.label, max_len=64)
+    if not label:
+        raise HTTPException(status_code=400, detail="Category label is required")
+    return ModelCategoryResponse(**create_model_category(label))
+
+
+@router.delete("/admin/model-categories/{category_id}", response_model=ModelCategoryResponse)
+def admin_delete_model_category_endpoint(
+    category_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelCategoryResponse:
+    _ensure_role(current_user, ROLE_ADMIN)
+    _ensure_email_verified(current_user)
+    removed = delete_model_category(category_id)
+    if removed is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return ModelCategoryResponse(**removed)
 
 
 @router.get("/me/saved-models", response_model=SavedModelListResponse)

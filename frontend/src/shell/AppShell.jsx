@@ -10,6 +10,7 @@ import {
   Moon,
   Shield,
   Sun,
+  Tags,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -120,13 +121,22 @@ export function AppShell() {
             );
           })}
           {authRole === "admin" ? (
-            <NavLink
-              to="/admin/users"
-              className={({ isActive }) => `shell-link ${isActive ? "shell-link-active" : ""}`}
-            >
-              <Shield size={18} />
-              <span>Admin</span>
-            </NavLink>
+            <>
+              <NavLink
+                to="/admin/users"
+                className={({ isActive }) => `shell-link ${isActive ? "shell-link-active" : ""}`}
+              >
+                <Shield size={18} />
+                <span>Users</span>
+              </NavLink>
+              <NavLink
+                to="/admin/categories"
+                className={({ isActive }) => `shell-link ${isActive ? "shell-link-active" : ""}`}
+              >
+                <Tags size={18} />
+                <span>Categories</span>
+              </NavLink>
+            </>
           ) : null}
         </nav>
       </aside>
