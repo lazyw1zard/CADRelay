@@ -4,9 +4,10 @@ import { Check, Download, Edit3, Eye, RefreshCw, Save, Star, Trash2, UploadCloud
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
-import { updateCurrentUserDisplayName } from "../lib/firebaseAuth";
+import { signOutCurrentUser, updateCurrentUserDisplayName } from "../lib/firebaseAuth";
 import {
   apiApproveModelVersion,
+  apiDeleteCurrentAccount,
   apiDeleteModelVersion,
   apiGetModelVersion,
   apiListModelVersions,
@@ -30,6 +31,7 @@ export function WorkspacePage() {
   const [profileNameDraft, setProfileNameDraft] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
+  const [accountDeleting, setAccountDeleting] = useState(false);
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
   const [thumbnailsById, setThumbnailsById] = useState(() => {
@@ -210,6 +212,32 @@ export function WorkspacePage() {
     }
   }
 
+  async function deleteAccount() {
+    if (!idToken || !authUser) return;
+    const confirmed = window.confirm(
+      "Удалить аккаунт и все загруженные модели? Это действие нельзя отменить."
+    );
+    if (!confirmed) return;
+
+    setAccountDeleting(true);
+    setError("");
+    try {
+      await apiDeleteCurrentAccount(idToken);
+      try {
+        localStorage.removeItem("cadrelay_thumbnails");
+        localStorage.removeItem(`cadrelay_favorites:${authUser.uid}`);
+      } catch {
+        // localStorage cleanup is best-effort.
+      }
+      await signOutCurrentUser();
+      navigate("/auth", { replace: true });
+    } catch (err) {
+      setError(String(err?.message || err));
+    } finally {
+      if (isMountedRef.current) setAccountDeleting(false);
+    }
+  }
+
   async function saveProfileName() {
     setProfileMessage("");
     if (profileNameDraft.trim().length > 80) {
@@ -306,6 +334,15 @@ export function WorkspacePage() {
               </div>
             ) : null}
             {profileMessage ? <p className="muted">{profileMessage}</p> : null}
+            <button
+              type="button"
+              className="button button-danger workspace-account-delete"
+              onClick={deleteAccount}
+              disabled={accountDeleting}
+            >
+              <Trash2 size={15} />
+              {accountDeleting ? "Удаляем..." : "Удалить аккаунт"}
+            </button>
           </div>
         </article>
 

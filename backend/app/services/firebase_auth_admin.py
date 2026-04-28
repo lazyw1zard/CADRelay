@@ -111,3 +111,10 @@ def set_auth_user_role(uid: str, role: str, credentials_path: str | None = None)
         "email_verified": bool(refreshed.email_verified),
         "role": _parse_role_from_claims(refreshed_claims),
     }
+
+
+def delete_auth_user(uid: str, credentials_path: str | None = None) -> None:
+    # Удаляет Firebase Auth пользователя через Admin SDK.
+    _init_firebase_admin(credentials_path=credentials_path)
+    assert _firebase_auth_module is not None
+    _firebase_auth_module.delete_user(uid)

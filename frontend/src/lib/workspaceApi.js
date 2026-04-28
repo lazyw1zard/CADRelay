@@ -77,6 +77,11 @@ export async function apiDeleteModelVersion(modelVersionId, token) {
   return resp.json();
 }
 
+export async function apiDeleteCurrentAccount(token) {
+  const resp = await apiFetch("/me", { token, method: "DELETE" });
+  return resp.json();
+}
+
 export async function apiAdminListUsers({ token, limit = 50, pageToken = "" }) {
   const qs = new URLSearchParams();
   qs.set("limit", String(limit));

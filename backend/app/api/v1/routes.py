@@ -21,7 +21,7 @@ from app.schemas.models import (
     ModelVersionResponse,
     UploadResponse,
 )
-from app.services.firebase_auth_admin import list_auth_users, set_auth_user_role
+from app.services.firebase_auth_admin import delete_auth_user, list_auth_users, set_auth_user_role
 from app.services.metadata_store import (
     add_approval,
     create_model_version,
@@ -381,6 +381,30 @@ def _ensure_can_read_access(record: dict, current_user: CurrentUser) -> None:
     raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _delete_model_version_with_artifacts(record: dict) -> bool:
+    model_version_id = str(record.get("id") or "")
+    if not model_version_id:
+        return False
+
+    # Убираем сообщения из локальной очереди, чтобы worker не обрабатывал удаленную модель.
+    remove_messages_for_model(model_version_id)
+
+    for key in (
+        record.get("storage_key_original"),
+        record.get("storage_key_glb"),
+        record.get("storage_key_thumbnail_custom"),
+    ):
+        if not key:
+            continue
+        try:
+            delete_bytes(key)
+        except Exception:
+            # Если файла уже нет - не блокируем удаление карточки модели.
+            pass
+
+    return delete_model_version(model_version_id) is not None
+
+
 @router.get("/model-versions/{model_version_id}", response_model=ModelVersionResponse)
 def get_model_version_endpoint(
     model_version_id: str,
@@ -408,26 +432,32 @@ def delete_model_version_endpoint(
         raise HTTPException(status_code=404, detail="Model version not found")
     _ensure_can_access(record, current_user)
 
-    # Убираем сообщения из локальной очереди, чтобы worker не обрабатывал удаленную модель.
-    remove_messages_for_model(model_version_id)
-
-    for key in (
-        record.get("storage_key_original"),
-        record.get("storage_key_glb"),
-        record.get("storage_key_thumbnail_custom"),
-    ):
-        if not key:
-            continue
-        try:
-            delete_bytes(key)
-        except Exception:
-            # Если файла уже нет - не блокируем удаление карточки модели.
-            pass
-
-    removed = delete_model_version(model_version_id)
-    if removed is None:
+    if not _delete_model_version_with_artifacts(record):
         raise HTTPException(status_code=404, detail="Model version not found")
     return {"model_version_id": model_version_id, "status": "deleted"}
+
+
+@router.delete("/me")
+def delete_current_user_endpoint(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, int | str]:
+    # Privacy/cleanup action: удаляем все модели владельца, затем Firebase Auth user.
+    deleted_models = 0
+    while True:
+        owned_rows = list_model_versions(owner_user_id=current_user.user_id, limit=200)
+        if not owned_rows:
+            break
+        for record in owned_rows:
+            if _delete_model_version_with_artifacts(record):
+                deleted_models += 1
+
+    if settings.auth_mode == "firebase":
+        try:
+            delete_auth_user(current_user.user_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to delete Firebase user: {exc}") from exc
+
+    return {"status": "deleted", "deleted_models": deleted_models}
 
 
 @router.get("/model-versions/{model_version_id}/download")
