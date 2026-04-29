@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, UploadCloud } from "lucide-react";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { apiListModelCategories, apiUploadModel } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 
@@ -70,7 +71,7 @@ export function WorkspaceUploadPage() {
       });
       navigate("/workspace");
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось загрузить модель."));
     } finally {
       setLoading(false);
     }
@@ -119,6 +120,7 @@ export function WorkspaceUploadPage() {
             value={modelName}
             onChange={(e) => setModelName(e.target.value)}
             placeholder="Например: Universal Clamp v2"
+            required
           />
         </label>
 
@@ -188,7 +190,7 @@ export function WorkspaceUploadPage() {
         </button>
       </form>
 
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
     </main>
   );
 }

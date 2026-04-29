@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatErrorMessage } from "./errorMessages";
 import { apiListSavedModels, apiSaveModel, apiUnsaveModel } from "./workspaceApi";
 
 export function useFavorites(userId, token) {
@@ -17,7 +18,7 @@ export function useFavorites(userId, token) {
       const data = await apiListSavedModels(token);
       setFavorites(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
-      setFavoritesError(String(err?.message || err));
+      setFavoritesError(formatErrorMessage(err, "Не удалось загрузить избранное."));
     } finally {
       setLoadingFavorites(false);
     }
@@ -42,7 +43,7 @@ export function useFavorites(userId, token) {
         : await apiSaveModel(model.id, token);
       setFavorites(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
-      setFavoritesError(String(err?.message || err));
+      setFavoritesError(formatErrorMessage(err, "Не удалось обновить избранное."));
     }
   }
 
@@ -53,7 +54,7 @@ export function useFavorites(userId, token) {
       const data = await apiUnsaveModel(modelId, token);
       setFavorites(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
-      setFavoritesError(String(err?.message || err));
+      setFavoritesError(formatErrorMessage(err, "Не удалось убрать модель из избранного."));
     }
   }
 

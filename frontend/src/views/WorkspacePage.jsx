@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Check, Download, Edit3, Eye, RefreshCw, Save, Star, Trash2, UploadCloud, X } from "lucide-react";
 import { generateGlbThumbnail } from "../lib/thumbnail";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import { signOutCurrentUser, updateCurrentUserDisplayName } from "../lib/firebaseAuth";
@@ -68,7 +69,7 @@ export function WorkspacePage() {
         const list = await apiListModelVersions({ ownerUserId: authUser.uid, token: idToken, limit: 100 });
         if (!cancelled) setRows(list);
       } catch (err) {
-        if (!cancelled) setError(String(err?.message || err));
+        if (!cancelled) setError(formatErrorMessage(err, "Не удалось загрузить твои модели."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -151,7 +152,7 @@ export function WorkspacePage() {
       const list = await apiListModelVersions({ ownerUserId: authUser.uid, token: idToken, limit: 100 });
       setRows(list);
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось обновить список моделей."));
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ export function WorkspacePage() {
       const updated = await apiGetModelVersion(id, idToken);
       setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось обновить модель."));
     }
   }
 
@@ -183,7 +184,7 @@ export function WorkspacePage() {
       });
       await refreshOne(id);
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось отправить review-решение."));
     }
   }
 
@@ -209,7 +210,7 @@ export function WorkspacePage() {
         return copy;
       });
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось удалить модель."));
     }
   }
 
@@ -232,7 +233,7 @@ export function WorkspacePage() {
       await signOutCurrentUser();
       navigate("/auth", { replace: true });
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось удалить аккаунт."));
     } finally {
       if (isMountedRef.current) setAccountDeleting(false);
     }
@@ -250,7 +251,7 @@ export function WorkspacePage() {
       setProfileEditing(false);
       setProfileMessage("Имя профиля обновлено.");
     } catch (err) {
-      setProfileMessage(String(err?.message || err));
+      setProfileMessage(formatErrorMessage(err, "Не удалось обновить имя профиля."));
     } finally {
       setProfileSaving(false);
     }
@@ -294,7 +295,7 @@ export function WorkspacePage() {
           </button>
           <button type="button" className="button button-secondary" onClick={refreshModels} disabled={loading}>
             <RefreshCw size={16} />
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? "Обновляем..." : "Обновить"}
           </button>
         </div>
       </header>
@@ -333,7 +334,7 @@ export function WorkspacePage() {
                 </button>
               </div>
             ) : null}
-            {profileMessage ? <p className="muted">{profileMessage}</p> : null}
+            {profileMessage ? <p className="muted" aria-live="polite">{profileMessage}</p> : null}
             <button
               type="button"
               className="button button-danger workspace-account-delete"
@@ -382,7 +383,7 @@ export function WorkspacePage() {
             <h2>Избранное</h2>
           </div>
           <div className="toolbar">
-            <span className="badge">{loadingFavorites ? "loading" : `${favorites.length}`}</span>
+            <span className="badge">{loadingFavorites ? "загрузка" : `${favorites.length}`}</span>
             <button type="button" className="btn-ghost" onClick={loadFavorites} disabled={loadingFavorites}>
               <RefreshCw size={14} />
               Обновить
@@ -390,7 +391,12 @@ export function WorkspacePage() {
           </div>
         </div>
 
-        {!loadingFavorites && favorites.length === 0 ? (
+        {loadingFavorites && favorites.length === 0 ? (
+          <div className="state-panel state-panel-compact" aria-live="polite">
+            <RefreshCw size={18} />
+            <p>Загружаем избранное...</p>
+          </div>
+        ) : !loadingFavorites && favorites.length === 0 ? (
           <div className="workspace-empty-state">
             <Star size={18} />
             <p className="muted">Пока пусто. Отмеченные модели появятся здесь после сохранения в Explore.</p>
@@ -399,7 +405,7 @@ export function WorkspacePage() {
             </button>
           </div>
         ) : (
-          <div className="workspace-model-grid">
+          <div className="workspace-model-grid" aria-busy={loadingFavorites}>
             {favorites.map((model, idx) => (
               <article key={model.id} className="model-card workspace-model-card workspace-favorite-card">
                 <button
@@ -473,10 +479,22 @@ export function WorkspacePage() {
           <span className="muted">{rows.length} items</span>
         </div>
 
-        {rows.length === 0 ? (
-          <p className="muted">Пока пусто. Добавь модель через кнопку справа.</p>
+        {loading && rows.length === 0 ? (
+          <div className="state-panel state-panel-compact" aria-live="polite">
+            <RefreshCw size={18} />
+            <p>Загружаем твои модели...</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="workspace-empty-state">
+            <UploadCloud size={18} />
+            <p className="muted">Пока пусто. Добавь первую модель, чтобы проверить загрузку и 3D preview.</p>
+            <button type="button" className="button button-primary" onClick={() => navigate("/workspace/new")}>
+              <UploadCloud size={15} />
+              Добавить модель
+            </button>
+          </div>
         ) : (
-          <div className="workspace-model-grid">
+          <div className="workspace-model-grid" aria-busy={loading}>
             {rows.map((r, idx) => (
               <article key={r.id} className="model-card workspace-model-card">
                 <button
@@ -562,9 +580,9 @@ export function WorkspacePage() {
         )}
       </section>
 
-      {authError ? <p className="error">{authError}</p> : null}
-      {error ? <p className="error">{error}</p> : null}
-      {favoritesError ? <p className="error">{favoritesError}</p> : null}
+      {authError ? <p className="error" role="alert">{authError}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      {favoritesError ? <p className="error" role="alert">{favoritesError}</p> : null}
     </main>
   );
 }

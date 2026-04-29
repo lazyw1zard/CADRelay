@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Box, Download } from "lucide-react";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { apiGetModelVersion, buildDownloadUrl } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 
@@ -38,7 +39,7 @@ export function WorkspaceRenderPage() {
         const data = await apiGetModelVersion(modelVersionId, idToken);
         if (!cancelled) setRow(data);
       } catch (err) {
-        if (!cancelled) setError(String(err?.message || err));
+        if (!cancelled) setError(formatErrorMessage(err, "Не удалось загрузить модель для просмотра."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -97,8 +98,12 @@ export function WorkspaceRenderPage() {
         </button>
       </section>
 
-      {loading ? <p className="muted">Загрузка модели...</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {loading ? (
+        <section className="state-panel state-panel-compact" aria-live="polite">
+          <p>Загрузка модели...</p>
+        </section>
+      ) : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
 
       {!loading && row && !row.storage_key_glb ? (
         <section className="card">

@@ -109,8 +109,12 @@ textarea:disabled {
 }
 
 .error {
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger-soft) 70%, transparent);
   color: var(--danger);
   font-weight: 650;
+  padding: 10px 12px;
 }
 
 .muted {
@@ -1156,6 +1160,39 @@ textarea {
 
 .workspace-empty-state .button {
   flex: 0 0 auto;
+}
+
+.state-panel {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-height: 118px;
+  border: 1px dashed color-mix(in srgb, var(--brand) 24%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  color: var(--text-soft);
+  padding: 18px;
+  text-align: center;
+}
+
+.state-panel-compact {
+  min-height: 72px;
+  justify-items: start;
+  text-align: left;
+}
+
+.state-panel p,
+.state-panel span {
+  margin: 0;
+}
+
+.state-panel p {
+  color: var(--text);
+  font-weight: 720;
+}
+
+.state-panel span {
+  font-size: 13px;
 }
 
 .workspace-favorite-card {

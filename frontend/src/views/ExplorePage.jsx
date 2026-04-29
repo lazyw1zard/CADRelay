@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, RefreshCw, Search, Star, UploadCloud } from "lucide-react";
 import { ModelDetailPanel } from "../components/ModelDetailPanel";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
@@ -62,7 +63,7 @@ export function ExplorePage() {
       setItems(Array.isArray(data.items) ? data.items : []);
       setNextOffset(data.next_offset ?? null);
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось загрузить модели."));
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export function ExplorePage() {
       setItems((prev) => [...prev, ...incoming]);
       setNextOffset(data.next_offset ?? null);
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось загрузить следующую страницу."));
     } finally {
       setLoading(false);
     }
@@ -277,6 +278,7 @@ export function ExplorePage() {
               type="button"
               className={`filter-chip ${activeFilter === value ? "filter-chip-active" : ""}`}
               onClick={() => setActiveFilter(value)}
+              aria-pressed={activeFilter === value}
             >
               {label}
             </button>
@@ -289,6 +291,7 @@ export function ExplorePage() {
                 type="button"
                 className={`filter-chip ${activeFilter === value ? "filter-chip-active" : ""}`}
                 onClick={() => setActiveFilter(value)}
+                aria-pressed={activeFilter === value}
               >
                 {category.label}
               </button>
@@ -316,7 +319,7 @@ export function ExplorePage() {
         </div>
       </section>
 
-      <section className={`explore-grid ${filterMotion ? `explore-grid-filter-${filterMotion}` : ""}`}>
+      <section className={`explore-grid ${filterMotion ? `explore-grid-filter-${filterMotion}` : ""}`} aria-busy={loading}>
         {displayedItems.map((model, idx) => (
           <article
             key={model.id}
@@ -347,6 +350,7 @@ export function ExplorePage() {
                 type="button"
                 className={`card-favorite-btn ${isFavorite(model.id) ? "card-favorite-active" : ""}`}
                 aria-disabled={!idToken}
+                aria-pressed={isFavorite(model.id)}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!idToken) return;
@@ -381,20 +385,38 @@ export function ExplorePage() {
         ))}
       </section>
 
-      {!loading && items.length === 0 ? <p className="muted">Пока нет ready-моделей в ленте.</p> : null}
-      {!loading && items.length > 0 && visibleItems.length === 0 ? <p className="muted">По этому фильтру ничего не найдено.</p> : null}
-      {error ? <p className="error">{error}</p> : null}
-      {favoritesError ? <p className="error">{favoritesError}</p> : null}
+      {loading && items.length === 0 ? (
+        <section className="state-panel" aria-live="polite">
+          <RefreshCw size={18} />
+          <p>Загружаем библиотеку моделей...</p>
+        </section>
+      ) : null}
+      {!loading && items.length === 0 ? (
+        <section className="state-panel">
+          <UploadCloud size={18} />
+          <p>В ленте пока нет готовых моделей.</p>
+          <span>Когда модель пройдет обработку и получит GLB-preview, она появится здесь.</span>
+        </section>
+      ) : null}
+      {!loading && items.length > 0 && visibleItems.length === 0 ? (
+        <section className="state-panel">
+          <Search size={18} />
+          <p>По этому фильтру ничего не найдено.</p>
+          <span>Попробуй другой формат, категорию или поисковый запрос.</span>
+        </section>
+      ) : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+      {favoritesError ? <p className="error" role="alert">{favoritesError}</p> : null}
 
       <div className="explore-pager">
         <button type="button" className="btn-ghost" onClick={loadFirstPage} disabled={loading}>
           <RefreshCw size={15} />
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? "Обновляем..." : "Обновить"}
         </button>
         {nextOffset !== null ? (
           <button type="button" className="btn-primary" onClick={loadMore} disabled={loading}>
             <UploadCloud size={15} />
-            {loading ? "Loading..." : "Load more"}
+            {loading ? "Загружаем..." : "Показать ещё"}
           </button>
         ) : null}
       </div>

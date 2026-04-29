@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import {
   apiAdminCreateModelCategory,
@@ -25,7 +26,7 @@ export function AdminCategoriesPage() {
       const rows = await apiAdminListModelCategories({ token: idToken });
       setCategories(Array.isArray(rows) ? rows : []);
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось загрузить категории."));
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ export function AdminCategoriesPage() {
       setLabelDraft("");
       await loadCategories();
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось добавить категорию."));
     } finally {
       setSaving(false);
     }
@@ -55,7 +56,7 @@ export function AdminCategoriesPage() {
       await apiAdminDeleteModelCategory({ token: idToken, categoryId });
       await loadCategories();
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось скрыть категорию."));
     } finally {
       setSaving(false);
     }
@@ -137,8 +138,16 @@ export function AdminCategoriesPage() {
           </button>
         </form>
 
-        {categories.length === 0 ? (
-          <p className="muted">Категории пока не загружены.</p>
+        {loading && categories.length === 0 ? (
+          <div className="state-panel state-panel-compact" aria-live="polite">
+            <RefreshCw size={18} />
+            <p>Загружаем категории...</p>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="state-panel state-panel-compact">
+            <p>Категории пока не загружены.</p>
+            <span>Добавь первую категорию, чтобы она появилась в Upload и Explore.</span>
+          </div>
         ) : (
           <div className="admin-category-list">
             {categories.map((category) => (
@@ -163,8 +172,8 @@ export function AdminCategoriesPage() {
         )}
       </section>
 
-      {authError ? <p className="error">{authError}</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {authError ? <p className="error" role="alert">{authError}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
     </main>
   );
 }

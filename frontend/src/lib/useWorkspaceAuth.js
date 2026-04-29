@@ -5,6 +5,7 @@ import {
   getFirebaseConfigStatus,
   watchAuthState,
 } from "./firebaseAuth";
+import { formatErrorMessage } from "./errorMessages";
 
 export function useWorkspaceAuth() {
   const firebaseReady = getFirebaseConfigStatus();
@@ -40,7 +41,7 @@ export function useWorkspaceAuth() {
         setIdToken("");
         setAuthRole("editor");
         setEmailVerified(Boolean(user.emailVerified));
-        setAuthError(String(err?.message || err));
+        setAuthError(formatErrorMessage(err, "Не удалось проверить сессию пользователя."));
       } finally {
         setAuthReady(true);
       }

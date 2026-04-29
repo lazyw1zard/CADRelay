@@ -621,7 +621,7 @@ export function GlbViewer({ glbUrl, onLoadMetrics }) {
           undefined,
           (err) => {
             if (disposed) return;
-            setViewerError(`Не удалось загрузить GLB: ${err?.message || "unknown error"}`);
+            setViewerError("Не удалось загрузить GLB. Проверь, что файл доступен и backend запущен.");
             setViewerLoading(false);
           }
         );
@@ -645,7 +645,7 @@ export function GlbViewer({ glbUrl, onLoadMetrics }) {
         window.addEventListener("resize", resizeHandler);
       } catch (err) {
         if (disposed) return;
-        setViewerError(`Viewer init error: ${err?.message || "unknown error"}`);
+        setViewerError("Не удалось запустить 3D viewer в браузере.");
         setViewerLoading(false);
       }
     }
@@ -839,7 +839,7 @@ export function GlbViewer({ glbUrl, onLoadMetrics }) {
         </div>
       )}
       {viewerLoading ? <p className="muted">Загрузка GLB...</p> : null}
-      {viewerError ? <p className="error">{viewerError}</p> : null}
+      {viewerError ? <p className="error" role="alert">{viewerError}</p> : null}
     </div>
   );
 }

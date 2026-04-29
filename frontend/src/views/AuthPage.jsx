@@ -8,6 +8,7 @@ import {
   signUpEmailPassword,
   watchAuthState,
 } from "../lib/firebaseAuth";
+import { formatErrorMessage } from "../lib/errorMessages";
 
 export function AuthPage() {
   const firebaseReady = getFirebaseConfigStatus();
@@ -72,7 +73,7 @@ export function AuthPage() {
         navigate("/workspace");
       }
     } catch (err) {
-      setError(String(err.message || err));
+      setError(formatErrorMessage(err, "Не удалось войти или создать аккаунт."));
     } finally {
       setBusy(false);
     }
@@ -123,12 +124,17 @@ export function AuthPage() {
 
         <label>
           Email
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
 
         <label>
           Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input
+            type="password"
+            autoComplete={authMode === "signup" ? "new-password" : "current-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </label>
 
         {authMode === "signup" ? (
@@ -152,7 +158,7 @@ export function AuthPage() {
       </form>
 
       {info ? <p className="muted">{info}</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
     </section>
   );
 }

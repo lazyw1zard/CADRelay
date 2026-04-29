@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, RefreshCw, Save } from "lucide-react";
+import { formatErrorMessage } from "../lib/errorMessages";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import { apiAdminListUsers, apiAdminSetUserRole } from "../lib/workspaceApi";
 
@@ -40,7 +41,7 @@ export function AdminUsersPage() {
       });
       setNextPageToken(data.next_page_token || "");
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось загрузить пользователей."));
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ export function AdminUsersPage() {
       const updated = await apiAdminSetUserRole({ token: idToken, uid, role });
       setUsers((prev) => prev.map((row) => (row.uid === uid ? updated : row)));
     } catch (err) {
-      setError(String(err?.message || err));
+      setError(formatErrorMessage(err, "Не удалось сохранить роль пользователя."));
     } finally {
       setSavingUid("");
     }
@@ -126,7 +127,7 @@ export function AdminUsersPage() {
           </button>
           <button type="button" onClick={() => loadUsers({ append: false })} disabled={loading || !emailVerified}>
             <RefreshCw size={16} />
-            {loading ? "Loading..." : "Refresh users"}
+            {loading ? "Загружаем..." : "Обновить"}
           </button>
         </div>
       </section>
@@ -134,8 +135,16 @@ export function AdminUsersPage() {
       {!emailVerified ? <p className="muted">Подтверди email, чтобы управлять ролями.</p> : null}
 
       <section className="card">
-        {users.length === 0 ? (
-          <p className="muted">Пользователи пока не загружены.</p>
+        {loading && users.length === 0 ? (
+          <div className="state-panel state-panel-compact" aria-live="polite">
+            <RefreshCw size={18} />
+            <p>Загружаем пользователей...</p>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="state-panel state-panel-compact">
+            <p>Пользователи пока не загружены.</p>
+            <span>Нажми «Обновить», когда Firebase admin endpoint будет доступен.</span>
+          </div>
         ) : (
           <table>
             <thead>
@@ -183,13 +192,13 @@ export function AdminUsersPage() {
 
         {nextPageToken ? (
           <button type="button" onClick={() => loadUsers({ append: true })} disabled={loading || !emailVerified}>
-            {loading ? "Loading..." : "Load more"}
+            {loading ? "Загружаем..." : "Показать ещё"}
           </button>
         ) : null}
       </section>
 
-      {authError ? <p className="error">{authError}</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {authError ? <p className="error" role="alert">{authError}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
     </main>
   );
 }
