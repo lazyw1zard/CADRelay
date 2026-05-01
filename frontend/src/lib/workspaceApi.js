@@ -102,6 +102,36 @@ export async function apiUpdateModelVersion({ modelVersionId, token, modelName, 
   return resp.json();
 }
 
+export async function apiFullUpdateModelVersion({
+  modelVersionId,
+  token,
+  modelName,
+  modelDescription,
+  modelCategory,
+  modelTags,
+  sourceFormat,
+  conversionProfile,
+  file,
+  thumbnailFile,
+}) {
+  const form = new FormData();
+  form.append("model_name", modelName);
+  form.append("model_description", modelDescription || "");
+  form.append("model_category", modelCategory || "");
+  form.append("model_tags", modelTags || "");
+  form.append("source_format", sourceFormat);
+  form.append("conversion_profile", conversionProfile);
+  if (file) form.append("file", file);
+  if (thumbnailFile) form.append("thumbnail_file", thumbnailFile);
+
+  const resp = await apiFetch(`/model-versions/${modelVersionId}/full-edit`, {
+    token,
+    method: "PUT",
+    body: form,
+  });
+  return resp.json();
+}
+
 export async function apiDeleteModelVersion(modelVersionId, token) {
   const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
   return resp.json();

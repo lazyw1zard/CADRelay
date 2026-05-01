@@ -14,8 +14,8 @@ import {
   ThumbsUp,
   Trash2,
   UploadCloud,
-  X,
 } from "lucide-react";
+import { ModelEditPanel } from "../components/ModelEditPanel";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
@@ -24,11 +24,11 @@ import { signOutCurrentUser, updateCurrentUserDisplayName } from "../lib/firebas
 import {
   apiDeleteCurrentAccount,
   apiDeleteModelVersion,
+  apiFullUpdateModelVersion,
   apiGetModelVersion,
   apiListModelCategories,
   apiListModelVersions,
   apiReactToModelVersion,
-  apiUpdateModelVersion,
   buildDownloadUrl,
 } from "../lib/workspaceApi";
 
@@ -45,11 +45,17 @@ function formatTagsInput(tags) {
   return Array.isArray(tags) ? tags.join(", ") : "";
 }
 
-function parseTagsInput(value) {
-  return value
-    .split(/[,;\n]+/)
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ru-RU", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function WorkspacePage() {
@@ -71,6 +77,10 @@ export function WorkspacePage() {
     modelDescription: "",
     modelCategory: "",
     modelTags: "",
+    sourceFormat: "step",
+    conversionProfile: "balanced",
+    modelFile: null,
+    thumbnailFile: null,
   });
   const [editSaving, setEditSaving] = useState(false);
   const [reactionById, setReactionById] = useState({});
@@ -201,6 +211,10 @@ export function WorkspacePage() {
     () => rows.filter((r) => r.status === "processing" || r.status === "uploaded").length,
     [rows]
   );
+  const editingModel = useMemo(
+    () => rows.find((row) => row.id === editingModelId) || null,
+    [rows, editingModelId]
+  );
 
   async function refreshModels() {
     if (!authUser || !idToken) return;
@@ -223,6 +237,10 @@ export function WorkspacePage() {
       modelDescription: model.model_description || "",
       modelCategory: model.model_category || "",
       modelTags: formatTagsInput(model.model_tags),
+      sourceFormat: model.source_format || "step",
+      conversionProfile: model.conversion_profile || "balanced",
+      modelFile: null,
+      thumbnailFile: null,
     });
   }
 
@@ -233,10 +251,17 @@ export function WorkspacePage() {
       modelDescription: "",
       modelCategory: "",
       modelTags: "",
+      sourceFormat: "step",
+      conversionProfile: "balanced",
+      modelFile: null,
+      thumbnailFile: null,
     });
   }
 
-  async function saveEditedModel(modelVersionId) {
+  async function saveEditedModel(event) {
+    event.preventDefault();
+    const modelVersionId = editingModelId;
+    if (!modelVersionId) return;
     if (!emailVerified) {
       setError("Подтверди email, чтобы редактировать модели.");
       return;
@@ -248,15 +273,33 @@ export function WorkspacePage() {
     setEditSaving(true);
     setError("");
     try {
-      const updated = await apiUpdateModelVersion({
+      const updated = await apiFullUpdateModelVersion({
         modelVersionId,
         token: idToken,
         modelName: editDraft.modelName.trim(),
         modelDescription: editDraft.modelDescription.trim(),
         modelCategory: editDraft.modelCategory,
-        modelTags: parseTagsInput(editDraft.modelTags),
+        modelTags: editDraft.modelTags,
+        sourceFormat: editDraft.sourceFormat,
+        conversionProfile: editDraft.conversionProfile,
+        file: editDraft.modelFile,
+        thumbnailFile: editDraft.thumbnailFile,
       });
       setRows((prev) => prev.map((row) => (row.id === modelVersionId ? updated : row)));
+      if (editDraft.modelFile || editDraft.thumbnailFile) {
+        setThumbnailsById((prev) => {
+          if (!prev[modelVersionId]) return prev;
+          const copy = { ...prev };
+          delete copy[modelVersionId];
+          return copy;
+        });
+        setThumbnailFailedById((prev) => {
+          if (!prev[modelVersionId]) return prev;
+          const copy = { ...prev };
+          delete copy[modelVersionId];
+          return copy;
+        });
+      }
       cancelEditModel();
     } catch (err) {
       setError(formatErrorMessage(err, "Не удалось сохранить модель."));
@@ -679,6 +722,9 @@ export function WorkspacePage() {
                   {Array.isArray(r.model_tags) && r.model_tags.length > 0 ? (
                     <p className="workspace-model-tags">{r.model_tags.join(", ")}</p>
                   ) : null}
+                  {r.updated_at ? (
+                    <p className="workspace-updated-at">Изменено: {formatDateTime(r.updated_at)}</p>
+                  ) : null}
 
                   <div className="workspace-model-actions workspace-model-actions-primary">
                     {r.storage_key_glb ? (
@@ -753,64 +799,6 @@ export function WorkspacePage() {
                     </details>
                   </div>
 
-                  {editingModelId === r.id ? (
-                    <form
-                      className="workspace-edit-form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        saveEditedModel(r.id);
-                      }}
-                    >
-                      <label>
-                        Название
-                        <input
-                          value={editDraft.modelName}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelName: e.target.value }))}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Категория
-                        <select
-                          value={editDraft.modelCategory}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelCategory: e.target.value }))}
-                        >
-                          <option value="">Без категории</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.label}>
-                              {category.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="workspace-edit-wide">
-                        Описание
-                        <textarea
-                          rows={3}
-                          value={editDraft.modelDescription}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelDescription: e.target.value }))}
-                        />
-                      </label>
-                      <label className="workspace-edit-wide">
-                        Теги
-                        <input
-                          value={editDraft.modelTags}
-                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelTags: e.target.value }))}
-                          placeholder="clamp, printable, fixture"
-                        />
-                      </label>
-                      <div className="workspace-edit-actions">
-                        <button type="submit" className="button button-primary" disabled={editSaving}>
-                          <Save size={14} />
-                          {editSaving ? "Сохраняем..." : "Сохранить"}
-                        </button>
-                        <button type="button" className="button button-secondary" onClick={cancelEditModel} disabled={editSaving}>
-                          <X size={14} />
-                          Отменить
-                        </button>
-                      </div>
-                    </form>
-                  ) : null}
                 </div>
               </article>
             ))}
@@ -821,6 +809,18 @@ export function WorkspacePage() {
       {authError ? <p className="error" role="alert">{authError}</p> : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
       {favoritesError ? <p className="error" role="alert">{favoritesError}</p> : null}
+
+      <ModelEditPanel
+        model={editingModel}
+        idToken={idToken}
+        thumbnail={editingModel ? thumbnailsById[editingModel.id] : ""}
+        categories={categories}
+        draft={editDraft}
+        onDraftChange={setEditDraft}
+        onClose={cancelEditModel}
+        onSave={saveEditedModel}
+        saving={editSaving}
+      />
     </main>
   );
 }

@@ -715,6 +715,18 @@ textarea:disabled {
   animation: detailScrimIn 0.18s ease-out both;
 }
 
+.detail-layer .detail-scrim {
+  background: rgba(9, 13, 18, 0.28);
+  border-radius: 0;
+  transform: none;
+}
+
+.detail-layer .detail-scrim:hover {
+  background: rgba(9, 13, 18, 0.28);
+  border-color: transparent;
+  transform: none;
+}
+
 .model-detail-panel {
   position: absolute;
   right: 12px;
@@ -1246,9 +1258,21 @@ textarea {
   border-color: color-mix(in srgb, var(--brand) 16%, var(--line));
 }
 
+.workspace-model-card {
+  position: relative;
+  overflow: visible;
+}
+
+.workspace-model-card:focus-within,
+.workspace-model-card:hover,
+.workspace-model-card:has(.workspace-menu[open]) {
+  z-index: 20;
+}
+
 .workspace-model-thumb-btn {
   border: 0;
   border-bottom: 1px solid var(--workspace-line);
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   width: 100%;
   margin: 0;
   padding: 0;
@@ -1305,6 +1329,13 @@ textarea {
   margin-top: 8px !important;
   font-size: 13px !important;
   color: var(--text-soft) !important;
+}
+
+.workspace-updated-at {
+  margin-top: 8px !important;
+  color: var(--text-faint) !important;
+  font-size: 12px !important;
+  font-weight: 660;
 }
 
 .workspace-model-actions {
@@ -1499,32 +1530,71 @@ textarea {
   color: var(--danger);
 }
 
-.workspace-edit-form {
+.model-edit-panel {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.model-edit-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.7fr);
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  gap: 0;
 }
 
-.workspace-edit-wide,
-.workspace-edit-actions {
-  grid-column: 1 / -1;
+.model-edit-section {
+  display: grid;
+  gap: 12px;
+  margin: 0 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.workspace-edit-form textarea {
-  min-height: 92px;
-}
-
-.workspace-edit-actions {
+.model-edit-section-heading {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.workspace-edit-actions .button {
-  flex: 1 1 150px;
+.model-edit-section-heading h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.model-edit-section-heading span,
+.model-edit-file small {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.model-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.model-edit-file {
+  border: 1px dashed color-mix(in srgb, var(--brand) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand-soft) 22%, transparent);
+  padding: 12px;
+}
+
+.model-edit-file > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-weight: 720;
+}
+
+.model-edit-file input {
+  padding: 7px;
+  background: var(--surface);
+}
+
+.model-edit-actions {
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
 }
 
 .workspace-upload-header {
@@ -2032,6 +2102,11 @@ textarea {
     background: rgba(9, 13, 18, 0.36);
   }
 
+  .detail-layer .detail-scrim,
+  .detail-layer .detail-scrim:hover {
+    background: rgba(9, 13, 18, 0.36);
+  }
+
   .model-detail-panel {
     inset: 0;
     width: auto;
@@ -2054,6 +2129,8 @@ textarea {
   .detail-grid,
   .detail-actions,
   .upload-field-grid,
+  .model-edit-grid,
+  .model-edit-actions,
   .profile-edit-row,
   .admin-category-form,
   .admin-category-row {
@@ -2158,8 +2235,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .workspace-model-footer,
-  .workspace-edit-actions {
+  .workspace-model-footer {
     align-items: stretch;
     flex-direction: column;
   }
@@ -2174,10 +2250,6 @@ textarea {
     min-width: 0;
     margin-top: 6px;
     box-shadow: var(--shadow-soft);
-  }
-
-  .workspace-edit-form {
-    grid-template-columns: 1fr;
   }
 
   .card,

@@ -161,6 +161,17 @@ def _thumbnail_media_type(storage_key: str) -> str:
     return "image/png"
 
 
+def _delete_storage_keys(keys: list[str | None]) -> None:
+    for key in keys:
+        if not key:
+            continue
+        try:
+            delete_bytes(key)
+        except Exception:
+            # Storage cleanup is best-effort: metadata update already points to the new artifact.
+            pass
+
+
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
     background_tasks: BackgroundTasks,
@@ -583,6 +594,139 @@ def update_model_version_endpoint(
     updated = update_model_version(model_version_id, **updates)
     if updated is None:
         raise HTTPException(status_code=404, detail="Model version not found")
+    return ModelVersionResponse(**updated)
+
+
+@router.put("/model-versions/{model_version_id}/full-edit", response_model=ModelVersionResponse)
+async def update_model_version_full_endpoint(
+    background_tasks: BackgroundTasks,
+    model_version_id: str,
+    model_name: str | None = Form(None),
+    model_description: str | None = Form(None),
+    model_category: str | None = Form(None),
+    model_tags: str | None = Form(None),
+    source_format: str | None = Form(None),
+    conversion_profile: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    thumbnail_file: UploadFile | None = File(None),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelVersionResponse:
+    _ensure_role(current_user, ROLE_EDIT)
+    _ensure_email_verified(current_user)
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
+
+    updates: dict[str, object] = {
+        "updated_by_user_id": current_user.user_id,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    if model_name is not None:
+        normalized_name = _normalize_text(model_name, max_len=120)
+        if not normalized_name:
+            raise HTTPException(status_code=400, detail="Model name is required")
+        updates["model_name"] = normalized_name
+    if model_description is not None:
+        updates["model_description"] = _normalize_text(model_description, max_len=2000)
+    if model_category is not None:
+        updates["model_category"] = _normalize_text(model_category, max_len=64)
+    if model_tags is not None:
+        updates["model_tags"] = _parse_tags(model_tags)
+
+    normalized_profile = (conversion_profile or record.get("conversion_profile") or "balanced").lower().strip()
+    if normalized_profile not in ALLOWED_CONVERSION_PROFILES:
+        raise HTTPException(status_code=400, detail="Unsupported conversion_profile")
+    updates["conversion_profile"] = normalized_profile
+
+    requested_format = source_format or record.get("source_format") or ""
+    normalized_format = requested_format.lower().strip()
+    if file is not None and not normalized_format:
+        normalized_format = Path(file.filename or "").suffix.lower().lstrip(".")
+    if normalized_format:
+        if normalized_format not in ALLOWED_SOURCE_FORMATS:
+            raise HTTPException(status_code=400, detail="Unsupported source_format")
+        updates["source_format"] = normalized_format
+
+    old_keys_to_delete: list[str | None] = []
+    new_original_key: str | None = None
+
+    if thumbnail_file is not None:
+        if not _is_supported_thumbnail(thumbnail_file):
+            raise HTTPException(status_code=400, detail="Unsupported thumbnail format")
+        thumbnail_payload = await thumbnail_file.read()
+        if thumbnail_payload:
+            if len(thumbnail_payload) > settings.max_thumbnail_bytes:
+                raise HTTPException(status_code=413, detail="Thumbnail exceeds max upload size")
+            try:
+                new_thumbnail_key = save_thumbnail_bytes(
+                    model_version_id=model_version_id,
+                    filename=thumbnail_file.filename or "thumbnail.png",
+                    payload=thumbnail_payload,
+                    content_type=thumbnail_file.content_type,
+                )
+            except RuntimeError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            if new_thumbnail_key != record.get("storage_key_thumbnail_custom"):
+                old_keys_to_delete.append(record.get("storage_key_thumbnail_custom"))
+            updates["storage_key_thumbnail_custom"] = new_thumbnail_key
+
+    if file is not None:
+        payload = await file.read()
+        if not payload:
+            raise HTTPException(status_code=400, detail="Empty file")
+        if len(payload) > settings.max_upload_bytes:
+            raise HTTPException(status_code=413, detail="File exceeds max upload size")
+        try:
+            new_original_key, checksum, size_bytes = save_original_bytes(
+                model_version_id=model_version_id,
+                filename=file.filename or f"upload.{normalized_format or 'step'}",
+                payload=payload,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        if new_original_key != record.get("storage_key_original"):
+            old_keys_to_delete.append(record.get("storage_key_original"))
+        old_keys_to_delete.append(record.get("storage_key_glb"))
+        updates.update(
+            {
+                "storage_key_original": new_original_key,
+                "storage_key_glb": None,
+                "checksum": checksum,
+                "size_bytes": size_bytes,
+                "conversion_ms": None,
+                "status": "processing",
+            }
+        )
+
+        if normalized_format == "3mf" and thumbnail_file is None:
+            embedded_thumbnail = extract_thumbnail_from_3mf(payload, max_bytes=settings.max_thumbnail_bytes)
+            if embedded_thumbnail is not None:
+                try:
+                    embedded_key = save_thumbnail_bytes(
+                        model_version_id=model_version_id,
+                        filename=embedded_thumbnail.filename,
+                        payload=embedded_thumbnail.payload,
+                        content_type=embedded_thumbnail.content_type,
+                    )
+                except RuntimeError as exc:
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                if embedded_key != record.get("storage_key_thumbnail_custom"):
+                    old_keys_to_delete.append(record.get("storage_key_thumbnail_custom"))
+                updates["storage_key_thumbnail_custom"] = embedded_key
+
+    updated = update_model_version(model_version_id, **updates)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+
+    if new_original_key:
+        remove_messages_for_model(model_version_id)
+        enqueue_conversion(model_version_id=model_version_id, storage_key_original=new_original_key)
+        if settings.auto_worker_enabled:
+            background_tasks.add_task(run_worker_once_for_model, model_version_id)
+
+    _delete_storage_keys(old_keys_to_delete)
     return ModelVersionResponse(**updated)
 
 

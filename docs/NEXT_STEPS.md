@@ -28,9 +28,22 @@
 - [x] Define and implement admin-only endpoint(s) for role assignment (UI-safe replacement for direct script usage).
 
 ## Near-term roadmap
+- [ ] Gradual Postgres migration ("Ship of Theseus" approach):
+  - add `postgres` implementation behind the existing `metadata_store` facade
+  - move core relations first: users, model versions, categories, saved models/favorites, reactions
+  - keep Firebase Auth working during the transition
+  - add simple backend email/password auth after Postgres metadata is stable
+  - migrate role/email verification semantics from Firebase claims to Postgres-backed users
+  - disable Firebase Auth only after the new auth path is tested end-to-end
 - [x] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic):
   - local queue backend works in MVP
   - redis/sqs adapters are scaffolded with explicit not-implemented error
+- [ ] Implement Redis queue backend before deployment:
+  - add Redis connection settings and dependency
+  - implement `CADRELAY_QUEUE_BACKEND=redis` behind the existing queue facade
+  - preserve current message shape (`conversion_requested`, payload, status, timestamps)
+  - make worker consume/ack/retry jobs safely instead of rewriting a local JSON queue
+  - keep `local` queue for tests and no-dependency development
 - [x] Add download endpoint for original CAD and GLB by `model_version_id`.
 - [ ] Expand embedded thumbnail extraction beyond `3mf` (where source format provides preview metadata/assets).
 - [x] Start minimal frontend page: upload + status polling + approve/reject.
