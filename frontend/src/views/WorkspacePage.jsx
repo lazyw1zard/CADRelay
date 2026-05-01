@@ -1,17 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, Download, Edit3, Eye, RefreshCw, Save, ShieldCheck, Star, Trash2, UploadCloud, X } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  Edit3,
+  Eye,
+  MoreHorizontal,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import { signOutCurrentUser, updateCurrentUserDisplayName } from "../lib/firebaseAuth";
 import {
-  apiApproveModelVersion,
   apiDeleteCurrentAccount,
   apiDeleteModelVersion,
   apiGetModelVersion,
+  apiListModelCategories,
   apiListModelVersions,
+  apiReactToModelVersion,
+  apiUpdateModelVersion,
   buildDownloadUrl,
 } from "../lib/workspaceApi";
 
@@ -24,19 +41,40 @@ function renderModelTitle(model) {
   return model.model_name || model.model_id || model.id;
 }
 
+function formatTagsInput(tags) {
+  return Array.isArray(tags) ? tags.join(", ") : "";
+}
+
+function parseTagsInput(value) {
+  return value
+    .split(/[,;\n]+/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 export function WorkspacePage() {
   const navigate = useNavigate();
   const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
   const { favorites, removeFavorite, loadFavorites, loadingFavorites, favoritesError } = useFavorites(authUser?.uid, idToken);
   const [rows, setRows] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [comment, setComment] = useState("");
   const [profileEditing, setProfileEditing] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [accountDeleting, setAccountDeleting] = useState(false);
+  const [editingModelId, setEditingModelId] = useState("");
+  const [editDraft, setEditDraft] = useState({
+    modelName: "",
+    modelDescription: "",
+    modelCategory: "",
+    modelTags: "",
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [reactionById, setReactionById] = useState({});
+  const [reactionSavingId, setReactionSavingId] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
   const [thumbnailFailedById, setThumbnailFailedById] = useState({});
   const [thumbnailsById, setThumbnailsById] = useState(() => {
@@ -84,6 +122,22 @@ export function WorkspacePage() {
       cancelled = true;
     };
   }, [authUser, idToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCategories() {
+      try {
+        const rows = await apiListModelCategories();
+        if (!cancelled) setCategories(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    }
+    loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!authUser || !idToken) return undefined;
@@ -162,33 +216,69 @@ export function WorkspacePage() {
     }
   }
 
-  async function refreshOne(id) {
+  function startEditModel(model) {
+    setEditingModelId(model.id);
+    setEditDraft({
+      modelName: model.model_name || "",
+      modelDescription: model.model_description || "",
+      modelCategory: model.model_category || "",
+      modelTags: formatTagsInput(model.model_tags),
+    });
+  }
+
+  function cancelEditModel() {
+    setEditingModelId("");
+    setEditDraft({
+      modelName: "",
+      modelDescription: "",
+      modelCategory: "",
+      modelTags: "",
+    });
+  }
+
+  async function saveEditedModel(modelVersionId) {
+    if (!emailVerified) {
+      setError("Подтверди email, чтобы редактировать модели.");
+      return;
+    }
+    if (!editDraft.modelName.trim()) {
+      setError("Укажи название модели.");
+      return;
+    }
+    setEditSaving(true);
     setError("");
     try {
-      const updated = await apiGetModelVersion(id, idToken);
-      setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      const updated = await apiUpdateModelVersion({
+        modelVersionId,
+        token: idToken,
+        modelName: editDraft.modelName.trim(),
+        modelDescription: editDraft.modelDescription.trim(),
+        modelCategory: editDraft.modelCategory,
+        modelTags: parseTagsInput(editDraft.modelTags),
+      });
+      setRows((prev) => prev.map((row) => (row.id === modelVersionId ? updated : row)));
+      cancelEditModel();
     } catch (err) {
-      setError(formatErrorMessage(err, "Не удалось обновить модель."));
+      setError(formatErrorMessage(err, "Не удалось сохранить модель."));
+    } finally {
+      setEditSaving(false);
     }
   }
 
-  async function approve(id, decision) {
+  async function reactToModel(modelVersionId, decision) {
     if (!emailVerified) {
-      setError("Подтверди email, чтобы отправлять approve/reject.");
+      setError("Подтверди email, чтобы оценивать модели.");
       return;
     }
+    setReactionSavingId(modelVersionId);
     setError("");
     try {
-      await apiApproveModelVersion({
-        modelVersionId: id,
-        decision,
-        comment,
-        actorUserId: authUser?.uid,
-        token: idToken,
-      });
-      await refreshOne(id);
+      await apiReactToModelVersion({ modelVersionId, decision, token: idToken });
+      setReactionById((prev) => ({ ...prev, [modelVersionId]: decision }));
     } catch (err) {
-      setError(formatErrorMessage(err, "Не удалось отправить review-решение."));
+      setError(formatErrorMessage(err, "Не удалось сохранить оценку модели."));
+    } finally {
+      setReactionSavingId("");
     }
   }
 
@@ -197,6 +287,8 @@ export function WorkspacePage() {
       setError("Подтверди email, чтобы удалять версии.");
       return;
     }
+    const confirmed = window.confirm("Удалить модель? Это действие нельзя отменить.");
+    if (!confirmed) return;
     setError("");
     try {
       await apiDeleteModelVersion(id, idToken);
@@ -362,15 +454,12 @@ export function WorkspacePage() {
         <article className="card workspace-actions-card">
           <div className="workspace-panel-heading">
             <div>
-              <p className="page-kicker">Review</p>
-              <h2>Решения по моделям</h2>
+              <p className="page-kicker">Operations</p>
+              <h2>Состояние библиотеки</h2>
             </div>
             <span className="badge">processing: {processingCount}</span>
           </div>
-          <label>
-            Comment for approve/reject
-            <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Опционально" />
-          </label>
+          <p className="muted">Карточки показывают готовность preview, файлы для скачивания и быстрые действия с моделью.</p>
         </article>
       </section>
 
@@ -472,18 +561,57 @@ export function WorkspacePage() {
                         GLB не готов
                       </button>
                     )}
-                    {idToken ? (
-                      <a href={buildDownloadUrl({ modelVersionId: model.id, kind: "original", token: idToken })}>
+                    <details className="workspace-menu">
+                      <summary>
                         <Download size={14} />
-                        Оригинал
-                      </a>
-                    ) : null}
+                        Скачать
+                        <ChevronDown size={13} />
+                      </summary>
+                      <div className="workspace-menu-popover">
+                        {idToken ? (
+                          <a href={buildDownloadUrl({ modelVersionId: model.id, kind: "original", token: idToken })}>Оригинал</a>
+                        ) : null}
+                        {model.preview_available ? (
+                          <a href={buildDownloadUrl({ modelVersionId: model.id, kind: "glb", token: idToken })}>GLB</a>
+                        ) : (
+                          <span>GLB не готов</span>
+                        )}
+                      </div>
+                    </details>
                   </div>
-                  <div className="workspace-model-actions workspace-model-actions-secondary">
-                    <button type="button" className="workspace-action-danger" onClick={() => removeFavorite(model.id)}>
-                      <Star size={14} fill="currentColor" />
-                      Убрать
-                    </button>
+                  <div className="workspace-model-footer">
+                    <div className="workspace-reaction-actions" aria-label="Оценка модели">
+                      <button
+                        type="button"
+                        className={reactionById[model.id] === "like" ? "workspace-reaction-active workspace-reaction-like-active" : ""}
+                        onClick={() => reactToModel(model.id, "like")}
+                        disabled={reactionSavingId === model.id}
+                        aria-label="Лайк"
+                      >
+                        <ThumbsUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={reactionById[model.id] === "dislike" ? "workspace-reaction-active workspace-reaction-dislike-active" : ""}
+                        onClick={() => reactToModel(model.id, "dislike")}
+                        disabled={reactionSavingId === model.id}
+                        aria-label="Дизлайк"
+                      >
+                        <ThumbsDown size={14} />
+                      </button>
+                    </div>
+                    <details className="workspace-menu workspace-menu-right">
+                      <summary>
+                        <MoreHorizontal size={14} />
+                        Действия
+                      </summary>
+                      <div className="workspace-menu-popover">
+                        <button type="button" onClick={() => removeFavorite(model.id)}>
+                          <Star size={14} fill="currentColor" />
+                          Убрать из избранного
+                        </button>
+                      </div>
+                    </details>
                   </div>
                 </div>
               </article>
@@ -524,7 +652,7 @@ export function WorkspacePage() {
                   className={`model-card-cover workspace-model-thumb-btn model-card-cover-${(idx % 3) + 1}`}
                   onClick={() => r.storage_key_glb && navigate(`/workspace/render/${r.id}`)}
                   disabled={!r.storage_key_glb}
-                  title={r.storage_key_glb ? "Open render page" : "GLB пока не готов"}
+                  title={r.storage_key_glb ? "Смотреть в 3D" : "GLB пока не готов"}
                 >
                   {r.storage_key_thumbnail_custom ? (
                     <img
@@ -564,39 +692,125 @@ export function WorkspacePage() {
                         GLB не готов
                       </button>
                     )}
-                    <button type="button" onClick={() => refreshOne(r.id)}>
-                      <RefreshCw size={14} />
-                      Обновить
-                    </button>
-                    <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>
-                      <Download size={14} />
-                      Original
-                    </a>
-                    {r.storage_key_glb ? (
-                      <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>
+                    <details className="workspace-menu">
+                      <summary>
                         <Download size={14} />
-                        GLB
-                      </a>
-                    ) : (
-                      <span className="workspace-link-disabled" aria-disabled="true">
-                        GLB
-                      </span>
-                    )}
+                        Скачать
+                        <ChevronDown size={13} />
+                      </summary>
+                      <div className="workspace-menu-popover">
+                        <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>Оригинал</a>
+                        {r.storage_key_glb ? (
+                          <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "glb", token: idToken })}>GLB</a>
+                        ) : (
+                          <span>GLB не готов</span>
+                        )}
+                      </div>
+                    </details>
                   </div>
-                  <div className="workspace-model-actions workspace-model-actions-secondary">
-                    <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
-                      <Check size={14} />
-                      Approve
-                    </button>
-                    <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
-                      <X size={14} />
-                      Reject
-                    </button>
-                    <button type="button" className="workspace-action-danger" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
+
+                  <div className="workspace-model-footer">
+                    <div className="workspace-reaction-actions" aria-label="Оценка модели">
+                      <button
+                        type="button"
+                        className={reactionById[r.id] === "like" ? "workspace-reaction-active workspace-reaction-like-active" : ""}
+                        onClick={() => reactToModel(r.id, "like")}
+                        disabled={reactionSavingId === r.id}
+                        aria-label="Лайк"
+                      >
+                        <ThumbsUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={reactionById[r.id] === "dislike" ? "workspace-reaction-active workspace-reaction-dislike-active" : ""}
+                        onClick={() => reactToModel(r.id, "dislike")}
+                        disabled={reactionSavingId === r.id}
+                        aria-label="Дизлайк"
+                      >
+                        <ThumbsDown size={14} />
+                      </button>
+                    </div>
+                    <details className="workspace-menu workspace-menu-right">
+                      <summary>
+                        <MoreHorizontal size={14} />
+                        Действия
+                      </summary>
+                      <div className="workspace-menu-popover">
+                        <button type="button" onClick={() => startEditModel(r)} disabled={!emailVerified}>
+                          <Edit3 size={14} />
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          className="workspace-menu-danger"
+                          onClick={() => removeModelVersion(r.id)}
+                          disabled={!emailVerified}
+                        >
+                          <Trash2 size={14} />
+                          Удалить
+                        </button>
+                      </div>
+                    </details>
                   </div>
+
+                  {editingModelId === r.id ? (
+                    <form
+                      className="workspace-edit-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        saveEditedModel(r.id);
+                      }}
+                    >
+                      <label>
+                        Название
+                        <input
+                          value={editDraft.modelName}
+                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelName: e.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Категория
+                        <select
+                          value={editDraft.modelCategory}
+                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelCategory: e.target.value }))}
+                        >
+                          <option value="">Без категории</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.label}>
+                              {category.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="workspace-edit-wide">
+                        Описание
+                        <textarea
+                          rows={3}
+                          value={editDraft.modelDescription}
+                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelDescription: e.target.value }))}
+                        />
+                      </label>
+                      <label className="workspace-edit-wide">
+                        Теги
+                        <input
+                          value={editDraft.modelTags}
+                          onChange={(e) => setEditDraft((prev) => ({ ...prev, modelTags: e.target.value }))}
+                          placeholder="clamp, printable, fixture"
+                        />
+                      </label>
+                      <div className="workspace-edit-actions">
+                        <button type="submit" className="button button-primary" disabled={editSaving}>
+                          <Save size={14} />
+                          {editSaving ? "Сохраняем..." : "Сохранить"}
+                        </button>
+                        <button type="button" className="button button-secondary" onClick={cancelEditModel} disabled={editSaving}>
+                          <X size={14} />
+                          Отменить
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
               </article>
             ))}

@@ -77,6 +77,31 @@ export async function apiApproveModelVersion({ modelVersionId, decision, comment
   return resp.json();
 }
 
+export async function apiReactToModelVersion({ modelVersionId, decision, token }) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}/reaction`, {
+    token,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  return resp.json();
+}
+
+export async function apiUpdateModelVersion({ modelVersionId, token, modelName, modelDescription, modelCategory, modelTags }) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}`, {
+    token,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model_name: modelName,
+      model_description: modelDescription,
+      model_category: modelCategory,
+      model_tags: modelTags,
+    }),
+  });
+  return resp.json();
+}
+
 export async function apiDeleteModelVersion(modelVersionId, token) {
   const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
   return resp.json();

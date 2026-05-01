@@ -17,6 +17,13 @@ class ModelVersionCreate(BaseModel):
     auth_subject: str | None = None
 
 
+class ModelVersionUpdate(BaseModel):
+    model_name: str | None = Field(default=None, min_length=1, max_length=120)
+    model_description: str | None = Field(default=None, max_length=2000)
+    model_category: str | None = Field(default=None, max_length=64)
+    model_tags: list[str] | None = None
+
+
 class ModelVersionResponse(BaseModel):
     id: str
     model_id: str
@@ -94,6 +101,10 @@ class ApprovalDecision(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
     comment: str | None = None
     created_by_user_id: str | None = None
+
+
+class ModelReactionDecision(BaseModel):
+    decision: Literal["like", "dislike"]
 
 
 class AdminRoleUpdateRequest(BaseModel):

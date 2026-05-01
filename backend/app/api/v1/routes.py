@@ -22,6 +22,8 @@ from app.schemas.models import (
     ModelCategoryUpdate,
     ModelVersionCreate,
     ModelVersionResponse,
+    ModelVersionUpdate,
+    ModelReactionDecision,
     SavedModelListResponse,
     UploadResponse,
 )
@@ -549,6 +551,41 @@ def get_model_version_endpoint(
     return ModelVersionResponse(**record)
 
 
+@router.patch("/model-versions/{model_version_id}", response_model=ModelVersionResponse)
+def update_model_version_endpoint(
+    model_version_id: str,
+    payload: ModelVersionUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelVersionResponse:
+    _ensure_role(current_user, ROLE_EDIT)
+    _ensure_email_verified(current_user)
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
+
+    updates: dict[str, object] = {
+        "updated_by_user_id": current_user.user_id,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    if payload.model_name is not None:
+        normalized_name = _normalize_text(payload.model_name, max_len=120)
+        if not normalized_name:
+            raise HTTPException(status_code=400, detail="Model name is required")
+        updates["model_name"] = normalized_name
+    if payload.model_description is not None:
+        updates["model_description"] = _normalize_text(payload.model_description, max_len=2000)
+    if payload.model_category is not None:
+        updates["model_category"] = _normalize_text(payload.model_category, max_len=64)
+    if payload.model_tags is not None:
+        updates["model_tags"] = _parse_tags(",".join(payload.model_tags))
+
+    updated = update_model_version(model_version_id, **updates)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    return ModelVersionResponse(**updated)
+
+
 @router.delete("/model-versions/{model_version_id}")
 def delete_model_version_endpoint(
     model_version_id: str,
@@ -629,6 +666,33 @@ def download_model_version_file(
         media_type = _thumbnail_media_type(storage_key)
     headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
     return Response(content=payload, media_type=media_type, headers=headers)
+
+
+@router.post("/model-versions/{model_version_id}/reaction")
+def react_to_model_version(
+    model_version_id: str,
+    payload: ModelReactionDecision,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict[str, str]:
+    _ensure_role(current_user, ROLE_VIEW)
+    _ensure_email_verified(current_user)
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_read_access(record, current_user)
+
+    reaction_record = add_approval(
+        {
+            "model_version_id": model_version_id,
+            "decision": payload.decision,
+            "created_by_user_id": current_user.user_id,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
+    return {
+        "model_version_id": reaction_record["model_version_id"],
+        "decision": reaction_record["decision"],
+    }
 
 
 @router.post("/model-versions/{model_version_id}/approval")
