@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
 import {
   apiAdminCreateModelCategory,
   apiAdminDeleteModelCategory,
   apiAdminListModelCategories,
+  apiAdminUpdateModelCategory,
 } from "../lib/workspaceApi";
 
 export function AdminCategoriesPage() {
@@ -14,6 +15,8 @@ export function AdminCategoriesPage() {
   const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
   const [categories, setCategories] = useState([]);
   const [labelDraft, setLabelDraft] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editingLabel, setEditingLabel] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,6 +60,50 @@ export function AdminCategoriesPage() {
       await loadCategories();
     } catch (err) {
       setError(formatErrorMessage(err, "Не удалось скрыть категорию."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveCategoryLabel(categoryId) {
+    const label = editingLabel.trim();
+    if (!label) return;
+    setSaving(true);
+    setError("");
+    try {
+      await apiAdminUpdateModelCategory({ token: idToken, categoryId, label });
+      setEditingId("");
+      setEditingLabel("");
+      await loadCategories();
+    } catch (err) {
+      setError(formatErrorMessage(err, "Не удалось переименовать категорию."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function moveCategory(index, direction) {
+    const target = categories[index];
+    const swap = categories[index + direction];
+    if (!target || !swap) return;
+    setSaving(true);
+    setError("");
+    try {
+      await Promise.all([
+        apiAdminUpdateModelCategory({
+          token: idToken,
+          categoryId: target.id,
+          sortOrder: swap.sort_order,
+        }),
+        apiAdminUpdateModelCategory({
+          token: idToken,
+          categoryId: swap.id,
+          sortOrder: target.sort_order,
+        }),
+      ]);
+      await loadCategories();
+    } catch (err) {
+      setError(formatErrorMessage(err, "Не удалось изменить порядок категорий."));
     } finally {
       setSaving(false);
     }
@@ -150,22 +197,97 @@ export function AdminCategoriesPage() {
           </div>
         ) : (
           <div className="admin-category-list">
-            {categories.map((category) => (
+            {categories.map((category, index) => (
               <div key={category.id} className={`admin-category-row ${category.active ? "" : "admin-category-disabled"}`}>
                 <div>
-                  <strong>{category.label}</strong>
-                  <span className="muted">{category.active ? "active" : "hidden"}</span>
+                  {editingId === category.id ? (
+                    <input
+                      value={editingLabel}
+                      onChange={(e) => setEditingLabel(e.target.value)}
+                      aria-label={`Новое название категории ${category.label}`}
+                    />
+                  ) : (
+                    <>
+                      <strong>{category.label}</strong>
+                      <span className="muted">{category.active ? "active" : "hidden"}</span>
+                    </>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => removeCategory(category.id)}
-                  disabled={saving || !emailVerified || !category.active}
-                  title="Скрыть категорию"
-                  aria-label={`Скрыть категорию ${category.label}`}
-                >
-                  <Trash2 size={15} />
-                </button>
+                <div className="admin-category-actions">
+                  {editingId === category.id ? (
+                    <>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => saveCategoryLabel(category.id)}
+                        disabled={saving || !emailVerified || !editingLabel.trim()}
+                        title="Сохранить"
+                        aria-label={`Сохранить категорию ${category.label}`}
+                      >
+                        <Check size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => {
+                          setEditingId("");
+                          setEditingLabel("");
+                        }}
+                        disabled={saving}
+                        title="Отменить"
+                        aria-label="Отменить переименование"
+                      >
+                        <X size={15} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => moveCategory(index, -1)}
+                        disabled={saving || !emailVerified || index === 0}
+                        title="Выше"
+                        aria-label={`Поднять категорию ${category.label}`}
+                      >
+                        <ArrowUp size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => moveCategory(index, 1)}
+                        disabled={saving || !emailVerified || index === categories.length - 1}
+                        title="Ниже"
+                        aria-label={`Опустить категорию ${category.label}`}
+                      >
+                        <ArrowDown size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => {
+                          setEditingId(category.id);
+                          setEditingLabel(category.label);
+                        }}
+                        disabled={saving || !emailVerified || !category.active}
+                        title="Переименовать"
+                        aria-label={`Переименовать категорию ${category.label}`}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => removeCategory(category.id)}
+                    disabled={saving || !emailVerified || !category.active}
+                    title="Скрыть категорию"
+                    aria-label={`Скрыть категорию ${category.label}`}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -191,3 +191,23 @@ def delete_model_category(category_id: str) -> dict[str, Any] | None:
     record["active"] = False
     ref.set(record)
     return record
+
+
+def update_model_category(
+    category_id: str,
+    *,
+    label: str | None = None,
+    sort_order: int | None = None,
+) -> dict[str, Any] | None:
+    client = _get_client()
+    ref = client.collection("categories").document(category_id)
+    doc = ref.get()
+    if not doc.exists:
+        return None
+    record = doc.to_dict()
+    if label is not None:
+        record["label"] = label.strip()
+    if sort_order is not None:
+        record["sort_order"] = int(sort_order)
+    ref.set(record)
+    return record

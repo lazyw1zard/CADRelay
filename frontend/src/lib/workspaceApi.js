@@ -140,6 +140,19 @@ export async function apiAdminDeleteModelCategory({ token, categoryId }) {
   return resp.json();
 }
 
+export async function apiAdminUpdateModelCategory({ token, categoryId, label, sortOrder }) {
+  const body = {};
+  if (label !== undefined) body.label = label;
+  if (sortOrder !== undefined) body.sort_order = sortOrder;
+  const resp = await apiFetch(`/admin/model-categories/${categoryId}`, {
+    token,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return resp.json();
+}
+
 export function buildDownloadUrl({ modelVersionId, kind, token }) {
   return withAuthToken(`${API_BASE}/model-versions/${modelVersionId}/download?kind=${kind}`, token);
 }

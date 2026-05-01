@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, UploadCloud } from "lucide-react";
+import { ArrowLeft, FileUp, ImageUp, Settings2, Tags, UploadCloud } from "lucide-react";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { apiListModelCategories, apiUploadModel } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
+
+function formatFileSize(file) {
+  if (!file?.size) return "";
+  const mb = file.size / 1024 / 1024;
+  if (mb >= 1) return `${mb.toFixed(2)} MB`;
+  return `${Math.max(1, Math.round(file.size / 1024))} KB`;
+}
 
 export function WorkspaceUploadPage() {
   const navigate = useNavigate();
@@ -104,90 +111,151 @@ export function WorkspaceUploadPage() {
     <main className="page workspace-page">
       <section className="card workspace-upload-header">
         <div>
-          <p className="page-kicker">New version</p>
-          <h1>Upload Model</h1>
+          <p className="page-kicker">New model</p>
+          <h1>Загрузка модели</h1>
+          <p className="page-subtitle">Добавь CAD/mesh файл, описание и параметры preview-конвертации.</p>
         </div>
         <button type="button" className="button button-secondary" onClick={() => navigate("/workspace")}>
           <ArrowLeft size={16} />
-          Back to workspace
+          Назад в workspace
         </button>
       </section>
 
-      <form className="card" onSubmit={handleUpload}>
-        <label>
-          Model Name
-          <input
-            value={modelName}
-            onChange={(e) => setModelName(e.target.value)}
-            placeholder="Например: Universal Clamp v2"
-            required
-          />
-        </label>
+      <form className="upload-layout" onSubmit={handleUpload}>
+        <section className="upload-main-panel">
+          <div className="upload-section-heading">
+            <FileUp size={18} />
+            <div>
+              <h2>Файл модели</h2>
+              <p>Оригинал будет сохранён, а worker подготовит GLB для веб-просмотра.</p>
+            </div>
+          </div>
 
-        <label>
-          Description
-          <textarea
-            rows={3}
-            value={modelDescription}
-            onChange={(e) => setModelDescription(e.target.value)}
-            placeholder="Кратко: для чего модель, особенности печати/сборки"
-          />
-        </label>
+          <label className={`upload-file-drop ${file ? "upload-file-drop-ready" : ""}`}>
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              aria-label="Выбрать файл модели"
+            />
+            <span className="upload-file-icon">
+              <UploadCloud size={24} />
+            </span>
+            <span>
+              <strong>{file ? file.name : "Выбери файл модели"}</strong>
+              <small>{file ? formatFileSize(file) : "STEP, STP, IGES, 3MF, STL или OBJ"}</small>
+            </span>
+          </label>
 
-        <label>
-          Category
-          <select value={modelCategory} onChange={(e) => setModelCategory(e.target.value)}>
-            <option value="">Без категории</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.label}>
-                {category.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="upload-field-grid">
+            <label>
+              Название
+              <input
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+                placeholder="Например: Universal Clamp v2"
+                required
+              />
+            </label>
 
-        <label>
-          Tags
-          <input value={modelTags} onChange={(e) => setModelTags(e.target.value)} placeholder="clamp, printable" />
-        </label>
+            <label>
+              Категория
+              <select value={modelCategory} onChange={(e) => setModelCategory(e.target.value)}>
+                <option value="">Без категории</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.label}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-        <label>
-          Custom thumbnail (optional)
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
-        </label>
+          <label>
+            Описание
+            <textarea
+              rows={5}
+              value={modelDescription}
+              onChange={(e) => setModelDescription(e.target.value)}
+              placeholder="Кратко: назначение модели, особенности печати, сборки или проверки"
+            />
+          </label>
 
-        <label>
-          Format
-          <select value={sourceFormat} onChange={(e) => setSourceFormat(e.target.value)}>
-            <option value="step">step</option>
-            <option value="stp">stp</option>
-            <option value="iges">iges</option>
-            <option value="igs">igs</option>
-            <option value="3mf">3mf</option>
-            <option value="stl">stl</option>
-            <option value="obj">obj</option>
-          </select>
-        </label>
+          <label>
+            <span className="upload-label-with-icon">
+              <Tags size={14} />
+              Теги
+            </span>
+            <input value={modelTags} onChange={(e) => setModelTags(e.target.value)} placeholder="clamp, printable, fixture" />
+          </label>
+        </section>
 
-        <label>
-          Conversion Profile
-          <select value={conversionProfile} onChange={(e) => setConversionProfile(e.target.value)}>
-            <option value="fast">fast (быстрее, грубее)</option>
-            <option value="balanced">balanced (по умолчанию)</option>
-            <option value="high">high (точнее, тяжелее)</option>
-          </select>
-        </label>
+        <aside className="upload-side-panel">
+          <section className="upload-side-section">
+            <div className="upload-section-heading">
+              <Settings2 size={18} />
+              <div>
+                <h2>Preview</h2>
+                <p>Параметры конвертации для 3D просмотра.</p>
+              </div>
+            </div>
 
-        <label>
-          File
-          <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+            <label>
+              Формат исходника
+              <select value={sourceFormat} onChange={(e) => setSourceFormat(e.target.value)}>
+                <option value="step">STEP</option>
+                <option value="stp">STP</option>
+                <option value="iges">IGES</option>
+                <option value="igs">IGS</option>
+                <option value="3mf">3MF</option>
+                <option value="stl">STL</option>
+                <option value="obj">OBJ</option>
+              </select>
+            </label>
 
-        {!emailVerified ? <p className="muted">Подтверди email, чтобы загружать и изменять данные.</p> : null}
-        <button type="submit" className="button button-primary" disabled={loading || !emailVerified}>
-          <UploadCloud size={16} />
-          {loading ? "Загрузка..." : "Upload"}
-        </button>
+            <label>
+              Профиль конвертации
+              <select value={conversionProfile} onChange={(e) => setConversionProfile(e.target.value)}>
+                <option value="fast">fast - быстрее, грубее</option>
+                <option value="balanced">balanced - по умолчанию</option>
+                <option value="high">high - точнее, тяжелее</option>
+              </select>
+            </label>
+          </section>
+
+          <section className="upload-side-section">
+            <div className="upload-section-heading">
+              <ImageUp size={18} />
+              <div>
+                <h2>Миниатюра</h2>
+                <p>Можно загрузить изображение, если автопревью не подходит.</p>
+              </div>
+            </div>
+
+            <label className={`upload-file-drop upload-file-drop-compact ${thumbnailFile ? "upload-file-drop-ready" : ""}`}>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)}
+                aria-label="Выбрать изображение миниатюры"
+              />
+              <span className="upload-file-icon">
+                <ImageUp size={20} />
+              </span>
+              <span>
+                <strong>{thumbnailFile ? thumbnailFile.name : "Опциональная миниатюра"}</strong>
+                <small>{thumbnailFile ? formatFileSize(thumbnailFile) : "PNG, JPG или WEBP"}</small>
+              </span>
+            </label>
+          </section>
+
+          <section className="upload-submit-panel">
+            {!emailVerified ? <p className="muted">Подтверди email, чтобы загружать и изменять данные.</p> : null}
+            <button type="submit" className="button button-primary" disabled={loading || !emailVerified}>
+              <UploadCloud size={16} />
+              {loading ? "Загрузка..." : "Загрузить модель"}
+            </button>
+          </section>
+        </aside>
       </form>
 
       {error ? <p className="error" role="alert">{error}</p> : null}

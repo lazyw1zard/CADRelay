@@ -19,6 +19,7 @@ from app.schemas.models import (
     ExploreModelListResponse,
     ModelCategoryCreate,
     ModelCategoryResponse,
+    ModelCategoryUpdate,
     ModelVersionCreate,
     ModelVersionResponse,
     SavedModelListResponse,
@@ -39,6 +40,7 @@ from app.services.metadata_store import (
     list_model_versions,
     save_model_for_user,
     unsave_model_for_user,
+    update_model_category,
     update_model_version,
 )
 from app.services.queue import enqueue_conversion, remove_messages_for_model
@@ -412,6 +414,23 @@ def admin_delete_model_category_endpoint(
     if removed is None:
         raise HTTPException(status_code=404, detail="Category not found")
     return ModelCategoryResponse(**removed)
+
+
+@router.patch("/admin/model-categories/{category_id}", response_model=ModelCategoryResponse)
+def admin_update_model_category_endpoint(
+    category_id: str,
+    payload: ModelCategoryUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ModelCategoryResponse:
+    _ensure_role(current_user, ROLE_ADMIN)
+    _ensure_email_verified(current_user)
+    label = _normalize_text(payload.label, max_len=64) if payload.label is not None else None
+    if payload.label is not None and not label:
+        raise HTTPException(status_code=400, detail="Category label is required")
+    updated = update_model_category(category_id, label=label, sort_order=payload.sort_order)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return ModelCategoryResponse(**updated)
 
 
 @router.get("/me/saved-models", response_model=SavedModelListResponse)

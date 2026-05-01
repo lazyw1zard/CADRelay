@@ -99,3 +99,12 @@ def create_model_category(label: str) -> dict[str, Any]:
 
 def delete_model_category(category_id: str) -> dict[str, Any] | None:
     return _backend_module().delete_model_category(category_id)
+
+
+def update_model_category(
+    category_id: str,
+    *,
+    label: str | None = None,
+    sort_order: int | None = None,
+) -> dict[str, Any] | None:
+    return _backend_module().update_model_category(category_id, label=label, sort_order=sort_order)

@@ -77,6 +77,11 @@ class ModelCategoryCreate(BaseModel):
     label: str = Field(min_length=1, max_length=64)
 
 
+class ModelCategoryUpdate(BaseModel):
+    label: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = Field(default=None, ge=0, le=10000)
+
+
 class ModelCategoryResponse(BaseModel):
     id: str
     label: str

@@ -1309,6 +1309,159 @@ textarea {
   margin: 0;
 }
 
+.upload-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 14px;
+  align-items: start;
+}
+
+.upload-main-panel,
+.upload-side-panel,
+.upload-side-section,
+.upload-submit-panel {
+  min-width: 0;
+}
+
+.upload-main-panel,
+.upload-side-section,
+.upload-submit-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+  padding: 18px;
+}
+
+.upload-main-panel,
+.upload-side-panel,
+.upload-side-section {
+  display: grid;
+  gap: 14px;
+}
+
+.upload-side-panel {
+  position: sticky;
+  top: 78px;
+}
+
+.upload-submit-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-submit-panel button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.upload-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.upload-section-heading > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--brand);
+}
+
+.upload-section-heading h2,
+.upload-section-heading p {
+  margin: 0;
+}
+
+.upload-section-heading h2 {
+  font-size: 18px;
+}
+
+.upload-section-heading p {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.upload-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(190px, 0.75fr);
+  gap: 12px;
+}
+
+.upload-file-drop {
+  position: relative;
+  min-height: 132px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px dashed color-mix(in srgb, var(--brand) 34%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--brand-soft) 28%, var(--surface));
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.upload-file-drop:hover,
+.upload-file-drop:focus-within {
+  border-color: color-mix(in srgb, var(--brand) 58%, var(--line));
+  background: color-mix(in srgb, var(--brand-soft) 44%, var(--surface));
+}
+
+.upload-file-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-file-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--brand);
+}
+
+.upload-file-drop strong,
+.upload-file-drop small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.upload-file-drop strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.upload-file-drop small {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-weight: 560;
+}
+
+.upload-file-drop-ready {
+  border-style: solid;
+  background: color-mix(in srgb, var(--success-soft) 42%, var(--surface));
+}
+
+.upload-file-drop-compact {
+  min-height: 92px;
+  padding: 14px;
+}
+
+.upload-label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .metrics,
 .workspace-page .metrics {
   display: grid;
@@ -1492,6 +1645,16 @@ textarea {
   flex-wrap: wrap;
 }
 
+.admin-category-row input {
+  min-height: 36px;
+}
+
+.admin-category-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .admin-category-disabled {
   opacity: 0.58;
 }
@@ -1536,6 +1699,14 @@ textarea {
 
   .workspace-dashboard-top {
     grid-template-columns: 1fr;
+  }
+
+  .upload-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-side-panel {
+    position: static;
   }
 
   .explore-grid,
@@ -1649,9 +1820,16 @@ textarea {
 
   .detail-grid,
   .detail-actions,
+  .upload-field-grid,
   .profile-edit-row,
-  .admin-category-form {
+  .admin-category-form,
+  .admin-category-row {
     grid-template-columns: 1fr;
+  }
+
+  .admin-category-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
@@ -1745,7 +1923,16 @@ textarea {
 
   .card,
   .auth-page-card,
-  .explore-hero {
+  .explore-hero,
+  .upload-main-panel,
+  .upload-side-section,
+  .upload-submit-panel {
     padding: 14px;
+  }
+
+  .upload-file-drop {
+    min-height: 110px;
+    grid-template-columns: 1fr;
+    justify-items: start;
   }
 }

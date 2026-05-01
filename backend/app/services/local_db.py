@@ -202,3 +202,23 @@ def delete_model_category(category_id: str) -> dict[str, Any] | None:
     data["categories"][category_id] = current
     _write_json(settings.metadata_file, data)
     return current
+
+
+def update_model_category(
+    category_id: str,
+    *,
+    label: str | None = None,
+    sort_order: int | None = None,
+) -> dict[str, Any] | None:
+    data = _load_json(settings.metadata_file, default={"model_versions": {}, "approvals": [], "saved_models": {}, "categories": {}})
+    data.setdefault("categories", {})
+    current = data["categories"].get(category_id)
+    if current is None:
+        return None
+    if label is not None:
+        current["label"] = label.strip()
+    if sort_order is not None:
+        current["sort_order"] = int(sort_order)
+    data["categories"][category_id] = current
+    _write_json(settings.metadata_file, data)
+    return current

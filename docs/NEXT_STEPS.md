@@ -42,7 +42,7 @@
 ## Cross-platform hardening
 - [x] Add Linux-friendly run scripts and keep PowerShell equivalents.
 - [x] Add CI smoke checks for backend startup and lint.
-- [ ] Create GitHub repository and push current branch history.
+- [x] Create GitHub repository and push current branch history.
 - [ ] Enable GitHub Actions in remote repo and verify first CI run is green.
 
 ## Product/UI polish (after admin)
@@ -61,12 +61,12 @@
   - admin-managed category list
   - category dropdown during upload instead of free text
   - category filters in Explore
-- [ ] Add category ordering and richer taxonomy:
+- [ ] Add category ordering and basic category editing:
   - admin sort order controls
-  - optional icons/descriptions
+  - rename category
   - edit-category flow for existing models
-- [ ] Add robust empty/error/loading states (no raw backend error text in final UX).
-- [ ] Ensure responsive behavior for desktop/mobile and basic accessibility (focus states, keyboard navigation, labels).
+- [x] Add robust empty/error/loading states (no raw backend error text in final UX).
+- [x] Ensure baseline responsive behavior and accessibility (focus states, keyboard navigation, labels, aria states).
 - [x] Add subtle motion for transitions/loading without impacting performance.
 - [x] Add render viewer toolbar:
   - fit/reset camera

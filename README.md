@@ -21,8 +21,14 @@ Hybrid CAD review MVP with future-ready architecture.
 ## Quick start scripts
 PowerShell:
 ```powershell
+.\scripts\run_dev.ps1
 .\scripts\run_backend.ps1
 .\scripts\run_worker.ps1
+```
+
+Run local checks:
+```powershell
+.\scripts\check.ps1
 ```
 
 Linux/macOS:
