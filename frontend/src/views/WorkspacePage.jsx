@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, Download, Edit3, Eye, RefreshCw, Save, Star, Trash2, UploadCloud, X } from "lucide-react";
+import { Check, Download, Edit3, Eye, RefreshCw, Save, ShieldCheck, Star, Trash2, UploadCloud, X } from "lucide-react";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
@@ -18,6 +18,10 @@ import {
 function getUserInitial(authUser) {
   const source = authUser?.email || authUser?.uid || "U";
   return source.trim().charAt(0).toUpperCase();
+}
+
+function renderModelTitle(model) {
+  return model.model_name || model.model_id || model.id;
 }
 
 export function WorkspacePage() {
@@ -285,13 +289,13 @@ export function WorkspacePage() {
       <header className="page-header">
         <div>
           <p className="page-kicker">Workspace</p>
-          <h1 className="page-title">Model Operations</h1>
+          <h1 className="page-title">Рабочее пространство</h1>
           <p className="page-subtitle">Твои модели, версии, preview-артефакты и решения по review-пайплайну.</p>
         </div>
         <div className="page-actions">
           <button type="button" className="button button-primary" onClick={() => navigate("/workspace/new")}>
             <UploadCloud size={16} />
-            Add model
+            Добавить модель
           </button>
           <button type="button" className="button button-secondary" onClick={refreshModels} disabled={loading}>
             <RefreshCw size={16} />
@@ -305,7 +309,10 @@ export function WorkspacePage() {
           <div className="workspace-user-avatar">{getUserInitial(authUser)}</div>
           <div className="workspace-user-main">
             <div className="workspace-user-heading">
-              <h2>Profile</h2>
+              <div>
+                <p className="page-kicker">Profile</p>
+                <h2>Профиль</h2>
+              </div>
               <button
                 type="button"
                 className="icon-btn"
@@ -317,9 +324,14 @@ export function WorkspacePage() {
               </button>
             </div>
             <p className="workspace-user-name">{authUser.displayName || authUser.email || "Unnamed user"}</p>
-            <p className="muted">{authUser.email || authUser.uid}</p>
-            <p className="muted">Role: {authRole}</p>
-            <p className="muted">Email verified: {emailVerified ? "yes" : "no"}</p>
+            <div className="workspace-profile-meta">
+              <span>{authUser.email || authUser.uid}</span>
+              <span>role: {authRole}</span>
+              <span className={emailVerified ? "workspace-verified" : ""}>
+                <ShieldCheck size={13} />
+                {emailVerified ? "email verified" : "email not verified"}
+              </span>
+            </div>
             {profileEditing ? (
               <div className="profile-edit-row">
                 <input
@@ -348,12 +360,17 @@ export function WorkspacePage() {
         </article>
 
         <article className="card workspace-actions-card">
-          <h2>Review Controls</h2>
+          <div className="workspace-panel-heading">
+            <div>
+              <p className="page-kicker">Review</p>
+              <h2>Решения по моделям</h2>
+            </div>
+            <span className="badge">processing: {processingCount}</span>
+          </div>
           <label>
             Comment for approve/reject
             <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Опционально" />
           </label>
-          <span className="badge">processing: {processingCount}</span>
         </article>
       </section>
 
@@ -431,7 +448,7 @@ export function WorkspacePage() {
                 </button>
 
                 <div className="model-card-body workspace-model-main">
-                  <h3>{model.model_name || model.model_id || model.id}</h3>
+                  <h3>{renderModelTitle(model)}</h3>
                   {model.model_description ? <p>{model.model_description}</p> : <p>{(model.source_format || "cad").toUpperCase()}</p>}
                   <div className="model-card-meta">
                     <span className={`workspace-status-chip workspace-status-${model.status || "unknown"}`}>
@@ -443,7 +460,7 @@ export function WorkspacePage() {
                     <p className="workspace-model-tags">{model.model_tags.join(", ")}</p>
                   ) : null}
 
-                  <div className="workspace-model-actions">
+                  <div className="workspace-model-actions workspace-model-actions-primary">
                     {model.preview_available ? (
                       <button type="button" onClick={() => navigate(`/workspace/render/${model.id}`)}>
                         <Eye size={14} />
@@ -461,6 +478,8 @@ export function WorkspacePage() {
                         Оригинал
                       </a>
                     ) : null}
+                  </div>
+                  <div className="workspace-model-actions workspace-model-actions-secondary">
                     <button type="button" className="workspace-action-danger" onClick={() => removeFavorite(model.id)}>
                       <Star size={14} fill="currentColor" />
                       Убрать
@@ -475,8 +494,11 @@ export function WorkspacePage() {
 
       <section className="card">
         <div className="row">
-          <h2>Мои модели</h2>
-          <span className="muted">{rows.length} items</span>
+          <div>
+            <p className="page-kicker">Library</p>
+            <h2>Мои модели</h2>
+          </div>
+          <span className="badge">{rows.length} items</span>
         </div>
 
         {loading && rows.length === 0 ? (
@@ -520,7 +542,7 @@ export function WorkspacePage() {
                 </button>
 
                 <div className="model-card-body workspace-model-main">
-                  <h3>{r.model_name || r.model_id || r.id}</h3>
+                  <h3>{renderModelTitle(r)}</h3>
                   {r.model_description ? <p>{r.model_description}</p> : <p>{(r.source_format || "cad").toUpperCase()}</p>}
                   <div className="model-card-meta">
                     <span className={`workspace-status-chip workspace-status-${r.status || "unknown"}`}>{r.status || "unknown"}</span>
@@ -530,34 +552,22 @@ export function WorkspacePage() {
                     <p className="workspace-model-tags">{r.model_tags.join(", ")}</p>
                   ) : null}
 
-                  <div className="workspace-model-actions">
-                    <button type="button" onClick={() => refreshOne(r.id)}>
-                      <RefreshCw size={14} />
-                      Refresh
-                    </button>
-                    <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
-                      <Check size={14} />
-                      Approve
-                    </button>
-                    <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
-                      <X size={14} />
-                      Reject
-                    </button>
-                    <button type="button" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
+                  <div className="workspace-model-actions workspace-model-actions-primary">
                     {r.storage_key_glb ? (
                       <button type="button" onClick={() => navigate(`/workspace/render/${r.id}`)}>
                         <Eye size={14} />
-                        Render
+                        Смотреть в 3D
                       </button>
                     ) : (
                       <button type="button" disabled>
                         <Eye size={14} />
-                        Render
+                        GLB не готов
                       </button>
                     )}
+                    <button type="button" onClick={() => refreshOne(r.id)}>
+                      <RefreshCw size={14} />
+                      Обновить
+                    </button>
                     <a href={buildDownloadUrl({ modelVersionId: r.id, kind: "original", token: idToken })}>
                       <Download size={14} />
                       Original
@@ -572,6 +582,20 @@ export function WorkspacePage() {
                         GLB
                       </span>
                     )}
+                  </div>
+                  <div className="workspace-model-actions workspace-model-actions-secondary">
+                    <button type="button" onClick={() => approve(r.id, "approve")} disabled={!emailVerified}>
+                      <Check size={14} />
+                      Approve
+                    </button>
+                    <button type="button" onClick={() => approve(r.id, "reject")} disabled={!emailVerified}>
+                      <X size={14} />
+                      Reject
+                    </button>
+                    <button type="button" className="workspace-action-danger" onClick={() => removeModelVersion(r.id)} disabled={!emailVerified}>
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
                   </div>
                 </div>
               </article>
