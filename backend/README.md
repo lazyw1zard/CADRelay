@@ -34,6 +34,33 @@ Linux/macOS:
 - Supported upload formats: `step`, `stp`, `iges`, `igs`, `3mf`, `stl`, `obj`.
 - Queue backend is selected via `CADRELAY_QUEUE_BACKEND` (`local` by default).
 
+## Postgres mode
+By default metadata backend is `local`.
+For Postgres backend, point the app at a database with `CADRELAY_POSTGRES_DSN`.
+
+Example `backend/.env`:
+
+```env
+CADRELAY_METADATA_BACKEND=postgres
+CADRELAY_POSTGRES_DSN=postgresql://cadrelay:cadrelay_dev@127.0.0.1:5432/cadrelay_dev
+CADRELAY_STORAGE_BACKEND=local
+CADRELAY_QUEUE_BACKEND=local
+CADRELAY_AUTO_WORKER_ENABLED=true
+```
+
+On startup `init_metadata_store()` creates the MVP tables if they do not exist:
+`model_versions`, `approvals`, `saved_models`, and `categories`.
+This is the first migration step; Alembic-style versioned migrations should be added before
+public production data starts accumulating.
+
+To copy existing local MVP metadata into Postgres:
+
+```powershell
+cd C:\Projects\CADRelay\backend
+.\.venv\Scripts\Activate.ps1
+python .\scripts\migrate_local_metadata_to_postgres.py --metadata-file .\data\metadata.json
+```
+
 ## Firestore mode
 By default metadata backend is `local`.
 For Firestore backend, `backend/.env` is required.

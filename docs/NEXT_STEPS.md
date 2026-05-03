@@ -29,8 +29,12 @@
 
 ## Near-term roadmap
 - [ ] Gradual Postgres migration ("Ship of Theseus" approach):
-  - add `postgres` implementation behind the existing `metadata_store` facade
-  - move core relations first: users, model versions, categories, saved models/favorites, reactions
+  - [x] add first `postgres` implementation behind the existing `metadata_store` facade
+  - [x] move metadata relations first: model versions, categories, saved models/favorites, reactions
+  - [x] add local `metadata.json` to Postgres migration script
+  - [ ] run live Postgres dev verification once a local/VPS database is available
+  - [ ] add versioned migrations before public production data accumulates
+  - [ ] move users into Postgres-backed app table
   - keep Firebase Auth working during the transition
   - add simple backend email/password auth after Postgres metadata is stable
   - migrate role/email verification semantics from Firebase claims to Postgres-backed users

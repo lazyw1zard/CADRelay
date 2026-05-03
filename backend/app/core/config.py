@@ -29,8 +29,9 @@ class Settings:
             "yes",
             "on",
         }
-        # local | firestore
+        # local | firestore | postgres
         self.metadata_backend = os.getenv("CADRELAY_METADATA_BACKEND", "local").strip().lower()
+        self.postgres_dsn = os.getenv("CADRELAY_POSTGRES_DSN", os.getenv("DATABASE_URL", "")).strip()
         # local | firebase
         self.storage_backend = os.getenv("CADRELAY_STORAGE_BACKEND", "local").strip().lower()
         self.firebase_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()

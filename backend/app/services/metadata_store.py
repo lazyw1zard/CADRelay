@@ -28,6 +28,8 @@ def _backend_module():
     if settings.metadata_backend == "firestore":
         _ensure_firestore_env()
         return importlib.import_module("app.services.firestore_db")
+    if settings.metadata_backend == "postgres":
+        return importlib.import_module("app.services.postgres_db")
     return local_db
 
 
