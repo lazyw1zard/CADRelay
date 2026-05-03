@@ -16,28 +16,36 @@ def _load_metadata(path: Path) -> dict[str, Any]:
         return json.load(fp)
 
 
+def _records(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return [row for row in value.values() if isinstance(row, dict)]
+    if isinstance(value, list):
+        return [row for row in value if isinstance(row, dict)]
+    return []
+
+
 def migrate(path: Path) -> dict[str, int]:
     data = _load_metadata(path)
     postgres_db.init_metadata_store()
 
     model_count = 0
-    for record in data.get("model_versions", {}).values():
+    for record in _records(data.get("model_versions", {})):
         postgres_db.create_model_version(record)
         model_count += 1
 
     saved_count = 0
-    for record in data.get("saved_models", {}).values():
+    for record in _records(data.get("saved_models", {})):
         postgres_db.save_model_for_user(record)
         saved_count += 1
 
     approval_count = 0
-    for record in data.get("approvals", []):
+    for record in _records(data.get("approvals", [])):
         if record.get("model_version_id"):
             postgres_db.add_approval(record)
             approval_count += 1
 
     category_count = 0
-    for record in data.get("categories", {}).values():
+    for record in _records(data.get("categories", {})):
         label = str(record.get("label") or "").strip()
         if not label:
             continue
