@@ -62,7 +62,7 @@ def _normalize_category_row(row: dict[str, Any] | None) -> dict[str, Any] | None
     if row is None:
         return None
     row["active"] = bool(row.get("active", True))
-    row["sort_order"] = int(row.get("sort_order") or 100)
+    row["sort_order"] = 100 if row.get("sort_order") is None else int(row["sort_order"])
     return row
 
 
