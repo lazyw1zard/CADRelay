@@ -445,7 +445,7 @@ export function GlbViewer({ glbUrl, onLoadMetrics }) {
     const url = renderer.domElement.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
-    a.download = "cadrelay-render.png";
+    a.download = "makelayer-render.png";
     a.click();
   }, []);
 

@@ -20,10 +20,10 @@ function Start-DevWindow {
   ) -WorkingDirectory $root
 }
 
-Start-DevWindow -Title "CADRelay backend" -Command "& '$backendScript'"
-Start-DevWindow -Title "CADRelay worker" -Command "& '$workerScript'"
-Start-DevWindow -Title "CADRelay frontend" -Command "Set-Location '$frontendDir'; npm run dev -- --host 127.0.0.1 --port 5173"
+Start-DevWindow -Title "MakeLayer backend" -Command "& '$backendScript'"
+Start-DevWindow -Title "MakeLayer worker" -Command "& '$workerScript'"
+Start-DevWindow -Title "MakeLayer frontend" -Command "Set-Location '$frontendDir'; npm run dev -- --host 127.0.0.1 --port 5173"
 
-Write-Host "CADRelay dev environment is starting in separate windows." -ForegroundColor Green
+Write-Host "MakeLayer dev environment is starting in separate windows." -ForegroundColor Green
 Write-Host "Backend:  http://127.0.0.1:8000" -ForegroundColor Cyan
 Write-Host "Frontend: http://127.0.0.1:5173" -ForegroundColor Cyan

@@ -1,4 +1,4 @@
-# CADRelay Backlog (MVP)
+# MakeLayer Backlog (MVP)
 
 ## Sprint 0 - Foundation
 - [ ] Определить целевой формат MVP (STEP как основной вход).

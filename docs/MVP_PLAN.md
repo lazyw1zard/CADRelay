@@ -1,4 +1,4 @@
-# CADRelay MVP Plan
+# MakeLayer MVP Plan
 
 ## 1. Цель MVP
 Собрать минимально рабочий процесс, в котором пользователь:

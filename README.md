@@ -1,6 +1,8 @@
-# CADRelay
+# MakeLayer
 
-Hybrid CAD review MVP with future-ready architecture.
+3D model exchange and web preview MVP with future-ready architecture.
+
+MakeLayer is the public product name. `CADRelay` remains the repository and internal service codename during the MVP phase.
 
 ## Project structure
 - docs/

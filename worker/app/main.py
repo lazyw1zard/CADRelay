@@ -291,7 +291,7 @@ def run_forever(data_dir: Path, poll_interval: float) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="CADRelay conversion worker")
+    parser = argparse.ArgumentParser(description="MakeLayer conversion worker")
     parser.add_argument("--once", action="store_true", help="Process a single pending message and exit")
     parser.add_argument("--model-version-id", default=None, help="Process pending message for specific model_version_id")
     parser.add_argument("--queue-stats", action="store_true", help="Show queue status summary and exit")

@@ -9,7 +9,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $backendDir = Join-Path $root "backend"
 $frontendDir = Join-Path $root "frontend"
 
-Write-Host "== CADRelay checks ==" -ForegroundColor Cyan
+Write-Host "== MakeLayer checks ==" -ForegroundColor Cyan
 
 Set-Location $backendDir
 if (-not (Test-Path ".venv")) {

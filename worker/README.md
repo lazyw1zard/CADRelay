@@ -1,6 +1,6 @@
 # worker
 
-Async conversion worker for CADRelay MVP.
+Async conversion worker for MakeLayer MVP.
 
 ## Local run
 

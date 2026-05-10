@@ -1,6 +1,6 @@
 # frontend
 
-Minimal React UI for CADRelay MVP.
+Minimal React UI for MakeLayer MVP.
 
 ## Run
 ```powershell

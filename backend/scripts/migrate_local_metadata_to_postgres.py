@@ -67,7 +67,7 @@ def migrate(path: Path) -> dict[str, int]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Migrate local CADRelay metadata.json to Postgres.")
+    parser = argparse.ArgumentParser(description="Migrate local MakeLayer metadata.json to Postgres.")
     parser.add_argument(
         "--metadata-file",
         type=Path,

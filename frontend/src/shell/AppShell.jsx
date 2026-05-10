@@ -100,8 +100,8 @@ export function AppShell() {
             <Box size={20} strokeWidth={2.1} />
           </span>
           <span>
-            <span className="shell-brand-name">CADRelay</span>
-            <span className="shell-brand-caption">Model exchange</span>
+            <span className="shell-brand-name">MakeLayer</span>
+            <span className="shell-brand-caption">3D model exchange</span>
           </span>
         </NavLink>
         <nav className="shell-nav">
@@ -155,7 +155,7 @@ export function AppShell() {
             </button>
             <div className="shell-product-status">
               <span className="status-dot" />
-              <span>Local MVP</span>
+              <span>MVP</span>
             </div>
           </div>
           <div className="shell-topbar-actions">

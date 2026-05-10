@@ -592,7 +592,7 @@ export function App() {
 
   return (
     <main className="page">
-      <h1>CADRelay MVP</h1>
+      <h1>MakeLayer MVP</h1>
       <p className="muted">Upload - processing - ready</p>
       <section className="card">
         <div className="row">

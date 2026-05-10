@@ -40,3 +40,10 @@
 - Decision: implement switchable storage backend (`local` | `firebase`) and keep `local` as active default for MVP.
 - Rationale: Firebase Storage currently requires billing; project needs no-cost path.
 - Consequence: use local file storage now, enable cloud storage later without API rewrites.
+
+## 2026-05-10
+
+### D-010: Public product name
+- Decision: use `MakeLayer` as the public product/domain name.
+- Rationale: better fit for a model-sharing and 3D-printing-adjacent product; domain `makelayer.org` is active.
+- Consequence: visible UI/docs use MakeLayer, while repository paths, env prefixes and package names keep `CADRelay` until a deliberate internal rename.

@@ -28,6 +28,10 @@
 - [x] Define and implement admin-only endpoint(s) for role assignment (UI-safe replacement for direct script usage).
 
 ## Near-term roadmap
+- [x] Public MakeLayer branding pass:
+  - replace visible `CADRelay` product name with `MakeLayer`
+  - update page titles, sidebar brand, empty states and deploy docs
+  - keep repo/internal service names stable until a later deliberate rename
 - [ ] Gradual Postgres migration ("Ship of Theseus" approach):
   - [x] add first `postgres` implementation behind the existing `metadata_store` facade
   - [x] move metadata relations first: model versions, categories, saved models/favorites, reactions
