@@ -8,7 +8,7 @@ import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
 import { apiListModelCategories, withAuthToken } from "../lib/workspaceApi";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 const PAGE_SIZE = 12;
 
 async function fetchExplorePage({ offset, limit }) {

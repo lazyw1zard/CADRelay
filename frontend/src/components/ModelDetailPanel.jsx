@@ -2,7 +2,7 @@ import { ArrowRight, Download, Star, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buildDownloadUrl, withAuthToken } from "../lib/workspaceApi";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
 function renderTitle(model) {
   return model?.model_name || model?.model_id || model?.id || "Model";

@@ -12,7 +12,7 @@ import {
   watchAuthState,
 } from "./lib/firebaseAuth";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 // Компонент 3D-viewer грузим только когда он реально нужен (lazy-loading).
 const GlbViewer = lazy(() => import("./components/GlbViewer").then((m) => ({ default: m.GlbViewer })));
 
