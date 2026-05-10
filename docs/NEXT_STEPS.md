@@ -59,12 +59,13 @@
   - make worker consume/ack/retry jobs safely instead of rewriting a local JSON queue
   - keep `local` queue for tests and no-dependency development
 - [x] Add download endpoint for original CAD and GLB by `model_version_id`.
-- [ ] Add model visibility and private sharing:
+- [x] Add model visibility and private sharing:
   - `public/private/unlisted` visibility field for model versions
   - Explore shows only public ready models
   - owner sees private/unlisted models in Workspace
-  - share-link token for unlisted/private model detail view
+  - share-link token for shared model detail view
   - protect original/GLB/thumbnail downloads with owner or share-token access
+  - production smoke verified after deploy
 - [ ] Expand embedded thumbnail extraction beyond `3mf` (where source format provides preview metadata/assets).
 - [x] Start minimal frontend page: upload + status polling + approve/reject.
 - [x] Add admin UI page for role management:
