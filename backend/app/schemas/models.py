@@ -11,6 +11,7 @@ class ModelVersionCreate(BaseModel):
     model_tags: list[str] | None = None
     source_format: str = Field(default="step", min_length=1)
     conversion_profile: str = Field(default="balanced", pattern="^(fast|balanced|high)$")
+    visibility: Literal["public", "unlisted", "private"] = "public"
     owner_user_id: str | None = None
     created_by_user_id: str | None = None
     auth_provider: str | None = None
@@ -22,6 +23,7 @@ class ModelVersionUpdate(BaseModel):
     model_description: str | None = Field(default=None, max_length=2000)
     model_category: str | None = Field(default=None, max_length=64)
     model_tags: list[str] | None = None
+    visibility: Literal["public", "unlisted", "private"] | None = None
 
 
 class ModelVersionResponse(BaseModel):
@@ -34,6 +36,8 @@ class ModelVersionResponse(BaseModel):
     source_format: str
     conversion_profile: str | None = None
     status: str
+    visibility: Literal["public", "unlisted", "private"] = "public"
+    share_token: str | None = None
     owner_user_id: str | None = None
     created_by_user_id: str | None = None
     updated_by_user_id: str | None = None
@@ -64,6 +68,7 @@ class ExploreModelCardResponse(BaseModel):
     source_format: str
     conversion_profile: str | None = None
     status: str
+    visibility: Literal["public", "unlisted", "private"] = "public"
     owner_user_id: str | None = None
     created_at: str | None = None
     preview_available: bool = False
@@ -105,6 +110,13 @@ class ApprovalDecision(BaseModel):
 
 class ModelReactionDecision(BaseModel):
     decision: Literal["like", "dislike"]
+
+
+class ShareLinkResponse(BaseModel):
+    model_version_id: str
+    share_token: str
+    share_path: str
+    share_url: str | None = None
 
 
 class AuthSignupRequest(BaseModel):

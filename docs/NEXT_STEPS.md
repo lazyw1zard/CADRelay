@@ -59,6 +59,12 @@
   - make worker consume/ack/retry jobs safely instead of rewriting a local JSON queue
   - keep `local` queue for tests and no-dependency development
 - [x] Add download endpoint for original CAD and GLB by `model_version_id`.
+- [ ] Add model visibility and private sharing:
+  - `public/private/unlisted` visibility field for model versions
+  - Explore shows only public ready models
+  - owner sees private/unlisted models in Workspace
+  - share-link token for unlisted/private model detail view
+  - protect original/GLB/thumbnail downloads with owner or share-token access
 - [ ] Expand embedded thumbnail extraction beyond `3mf` (where source format provides preview metadata/assets).
 - [x] Start minimal frontend page: upload + status polling + approve/reject.
 - [x] Add admin UI page for role management:
@@ -92,6 +98,11 @@
   - admin sort order controls
   - rename category
   - edit-category flow for existing models
+- [ ] Frontend polish pass before wider sharing:
+  - MakeLayer favicon/app icon
+  - tighten layout details on Explore, Workspace, Upload and auth pages
+  - review mobile/tablet spacing after Postgres auth changes
+  - replace remaining English labels where Russian UI is clearer
 - [x] Add robust empty/error/loading states (no raw backend error text in final UX).
 - [x] Ensure baseline responsive behavior and accessibility (focus states, keyboard navigation, labels, aria states).
 - [x] Add subtle motion for transitions/loading without impacting performance.

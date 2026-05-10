@@ -40,6 +40,7 @@ export async function apiUploadModel({
   thumbnailFile,
   sourceFormat,
   conversionProfile,
+  visibility = "public",
   file,
   token,
 }) {
@@ -52,6 +53,7 @@ export async function apiUploadModel({
   if (thumbnailFile) form.append("thumbnail_file", thumbnailFile);
   form.append("source_format", sourceFormat);
   form.append("conversion_profile", conversionProfile);
+  form.append("visibility", visibility);
   form.append("file", file);
 
   const resp = await apiFetch("/uploads", { token, method: "POST", body: form });
@@ -111,6 +113,7 @@ export async function apiFullUpdateModelVersion({
   modelTags,
   sourceFormat,
   conversionProfile,
+  visibility,
   file,
   thumbnailFile,
 }) {
@@ -121,6 +124,7 @@ export async function apiFullUpdateModelVersion({
   form.append("model_tags", modelTags || "");
   form.append("source_format", sourceFormat);
   form.append("conversion_profile", conversionProfile);
+  form.append("visibility", visibility || "public");
   if (file) form.append("file", file);
   if (thumbnailFile) form.append("thumbnail_file", thumbnailFile);
 
@@ -136,6 +140,19 @@ export async function apiDeleteModelVersion(modelVersionId, token) {
   const resp = await apiFetch(`/model-versions/${modelVersionId}`, { token, method: "DELETE" });
   return resp.json();
 }
+
+
+export async function apiCreateShareLink(modelVersionId, token) {
+  const resp = await apiFetch(`/model-versions/${modelVersionId}/share-link`, { token, method: "POST" });
+  return resp.json();
+}
+
+
+export async function apiGetSharedModel(shareToken) {
+  const resp = await apiFetch(`/shared/model-versions/${shareToken}`);
+  return resp.json();
+}
+
 
 export async function apiDeleteCurrentAccount(token) {
   const resp = await apiFetch("/me", { token, method: "DELETE" });
@@ -210,4 +227,8 @@ export async function apiAdminUpdateModelCategory({ token, categoryId, label, so
 
 export function buildDownloadUrl({ modelVersionId, kind, token }) {
   return withAuthToken(`${API_BASE}/model-versions/${modelVersionId}/download?kind=${kind}`, token);
+}
+
+export function buildSharedDownloadUrl({ shareToken, kind }) {
+  return `${API_BASE}/shared/model-versions/${shareToken}/download?kind=${kind}`;
 }

@@ -58,6 +58,7 @@ def get_model_version(model_version_id: str) -> dict[str, Any] | None:
 def list_model_versions(
     owner_user_id: str | None = None,
     status: str | None = None,
+    visibility: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -68,10 +69,24 @@ def list_model_versions(
         rows = [r for r in rows if r.get("owner_user_id") == owner_user_id]
     if status:
         rows = [r for r in rows if r.get("status") == status]
+    if visibility:
+        rows = [r for r in rows if (r.get("visibility") or "public") == visibility]
     rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
     safe_limit = max(1, min(limit, 200))
     safe_offset = max(0, offset)
     return rows[safe_offset : safe_offset + safe_limit]
+
+
+def get_model_version_by_share_token(share_token: str) -> dict[str, Any] | None:
+    token = share_token.strip()
+    if not token:
+        return None
+    client = _get_client()
+    docs = client.collection("model_versions").where("share_token", "==", token).limit(1).stream()
+    for doc in docs:
+        if doc.exists:
+            return doc.to_dict()
+    return None
 
 
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:

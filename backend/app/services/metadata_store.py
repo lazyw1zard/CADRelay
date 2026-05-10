@@ -48,15 +48,21 @@ def get_model_version(model_version_id: str) -> dict[str, Any] | None:
 def list_model_versions(
     owner_user_id: str | None = None,
     status: str | None = None,
+    visibility: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     return _backend_module().list_model_versions(
         owner_user_id=owner_user_id,
         status=status,
+        visibility=visibility,
         limit=limit,
         offset=offset,
     )
+
+
+def get_model_version_by_share_token(share_token: str) -> dict[str, Any] | None:
+    return _backend_module().get_model_version_by_share_token(share_token)
 
 
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:

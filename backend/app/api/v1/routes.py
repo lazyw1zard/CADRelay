@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import re
+import secrets
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
@@ -30,6 +31,7 @@ from app.schemas.models import (
     ModelReactionDecision,
     ProfileUpdateRequest,
     SavedModelListResponse,
+    ShareLinkResponse,
     UploadResponse,
 )
 from app.services.firebase_auth_admin import delete_auth_user, list_auth_users, set_auth_user_role
@@ -42,6 +44,7 @@ from app.services.metadata_store import (
     delete_saved_models_for_model,
     delete_saved_models_for_user,
     get_model_version,
+    get_model_version_by_share_token,
     list_model_categories,
     list_saved_model_ids,
     list_model_versions,
@@ -69,6 +72,7 @@ router = APIRouter()
 # На MVP поддерживаем CAD + mesh-форматы для 3D-печати.
 ALLOWED_SOURCE_FORMATS = {"step", "stp", "iges", "igs", "3mf", "stl", "obj"}
 ALLOWED_CONVERSION_PROFILES = {"fast", "balanced", "high"}
+ALLOWED_VISIBILITY = {"public", "unlisted", "private"}
 ROLE_VIEW = {"viewer", "editor", "reviewer", "admin"}
 ROLE_EDIT = {"editor", "admin"}
 ROLE_REVIEW = {"editor", "reviewer", "admin"}
@@ -123,6 +127,27 @@ def _normalize_text(value: str | None, *, max_len: int) -> str | None:
     return cleaned[:max_len]
 
 
+def _normalize_visibility(value: str | None) -> str:
+    visibility = (value or "public").strip().lower()
+    if visibility not in ALLOWED_VISIBILITY:
+        raise HTTPException(status_code=400, detail="Unsupported visibility")
+    return visibility
+
+
+def _new_share_token() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def _ensure_share_token(record: dict) -> dict:
+    token = record.get("share_token")
+    if token:
+        return record
+    updated = update_model_version(record["id"], share_token=_new_share_token(), updated_at=datetime.now(UTC).isoformat())
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    return updated
+
+
 def _parse_tags(raw: str | None) -> list[str]:
     if not raw:
         return []
@@ -156,6 +181,7 @@ def _to_explore_card(row: dict) -> ExploreModelCardResponse:
         source_format=row["source_format"],
         conversion_profile=row.get("conversion_profile"),
         status=row["status"],
+        visibility=row.get("visibility") or "public",
         owner_user_id=row.get("owner_user_id"),
         created_at=row.get("created_at"),
         preview_available=bool(row.get("storage_key_glb")),
@@ -270,6 +296,7 @@ async def upload_model(
     model_tags: str | None = Form(None),
     source_format: str = Form("step"),
     conversion_profile: str = Form("balanced"),
+    visibility: str = Form("public"),
     owner_user_id: str | None = Form(None),
     created_by_user_id: str | None = Form(None),
     auth_provider: str | None = Form(None),
@@ -289,6 +316,7 @@ async def upload_model(
     if normalized_profile not in ALLOWED_CONVERSION_PROFILES:
         raise HTTPException(status_code=400, detail="Unsupported conversion_profile")
     normalized_name = _normalize_text(model_name, max_len=120)
+    normalized_visibility = _normalize_visibility(visibility)
     normalized_description = _normalize_text(model_description, max_len=2000)
     normalized_category = _normalize_text(model_category, max_len=64)
     normalized_tags = _parse_tags(model_tags)
@@ -362,6 +390,8 @@ async def upload_model(
             "source_format": normalized_format,
             "conversion_profile": normalized_profile,
             "status": "uploaded",
+            "visibility": normalized_visibility,
+            "share_token": _new_share_token() if normalized_visibility == "unlisted" else None,
             "owner_user_id": owner,
             "created_by_user_id": creator,
             "updated_by_user_id": creator,
@@ -408,6 +438,7 @@ def create_model_version_endpoint(
     normalized_name = _normalize_text(payload.model_name, max_len=120)
     normalized_description = _normalize_text(payload.model_description, max_len=2000)
     normalized_category = _normalize_text(payload.model_category, max_len=64)
+    normalized_visibility = _normalize_visibility(payload.visibility)
     normalized_tags = _parse_tags(",".join(payload.model_tags or []))
     resolved_model_id = _normalize_text(payload.model_id, max_len=120) or normalized_name or f"model_{uuid4().hex[:10]}"
     owner, creator, provider, subject = _resolve_user_fields(
@@ -428,6 +459,8 @@ def create_model_version_endpoint(
             "source_format": payload.source_format,
             "conversion_profile": payload.conversion_profile,
             "status": "uploaded",
+            "visibility": normalized_visibility,
+            "share_token": _new_share_token() if normalized_visibility == "unlisted" else None,
             "owner_user_id": owner,
             "created_by_user_id": creator,
             "updated_by_user_id": creator,
@@ -467,7 +500,7 @@ def list_explore_model_versions_endpoint(
     offset: int = Query(default=0, ge=0),
 ) -> ExploreModelListResponse:
     # Публичная лента: отдаем только ready-модели с пагинацией.
-    rows = list_model_versions(status="ready", limit=limit + 1, offset=offset)
+    rows = list_model_versions(status="ready", visibility="public", limit=limit + 1, offset=offset)
     has_more = len(rows) > limit
     page_rows = rows[:limit]
 
@@ -678,6 +711,11 @@ def update_model_version_endpoint(
         updates["model_category"] = _normalize_text(payload.model_category, max_len=64)
     if payload.model_tags is not None:
         updates["model_tags"] = _parse_tags(",".join(payload.model_tags))
+    if payload.visibility is not None:
+        normalized_visibility = _normalize_visibility(payload.visibility)
+        updates["visibility"] = normalized_visibility
+        if normalized_visibility == "unlisted" and not record.get("share_token"):
+            updates["share_token"] = _new_share_token()
 
     updated = update_model_version(model_version_id, **updates)
     if updated is None:
@@ -695,6 +733,7 @@ async def update_model_version_full_endpoint(
     model_tags: str | None = Form(None),
     source_format: str | None = Form(None),
     conversion_profile: str | None = Form(None),
+    visibility: str | None = Form(None),
     file: UploadFile | None = File(None),
     thumbnail_file: UploadFile | None = File(None),
     current_user: CurrentUser = Depends(get_current_user),
@@ -721,6 +760,11 @@ async def update_model_version_full_endpoint(
         updates["model_category"] = _normalize_text(model_category, max_len=64)
     if model_tags is not None:
         updates["model_tags"] = _parse_tags(model_tags)
+    if visibility is not None:
+        normalized_visibility = _normalize_visibility(visibility)
+        updates["visibility"] = normalized_visibility
+        if normalized_visibility == "unlisted" and not record.get("share_token"):
+            updates["share_token"] = _new_share_token()
 
     normalized_profile = (conversion_profile or record.get("conversion_profile") or "balanced").lower().strip()
     if normalized_profile not in ALLOWED_CONVERSION_PROFILES:
@@ -874,6 +918,76 @@ def download_model_version_file(
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     _ensure_can_read_access(record, current_user)
+
+    if kind == "original":
+        storage_key = record.get("storage_key_original")
+    elif kind == "glb":
+        storage_key = record.get("storage_key_glb")
+    else:
+        storage_key = record.get("storage_key_thumbnail_custom")
+    if not storage_key:
+        raise HTTPException(status_code=404, detail=f"{kind} file is not available")
+
+    try:
+        payload = load_bytes(storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"{kind} file not found in storage") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    filename = storage_key.split("/")[-1]
+    if kind == "original":
+        media_type = "application/octet-stream"
+    elif kind == "glb":
+        media_type = "model/gltf-binary"
+    else:
+        media_type = _thumbnail_media_type(storage_key)
+    headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
+    return Response(content=payload, media_type=media_type, headers=headers)
+
+
+@router.post("/model-versions/{model_version_id}/share-link", response_model=ShareLinkResponse)
+def create_model_share_link(
+    model_version_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ShareLinkResponse:
+    _ensure_role(current_user, ROLE_VIEW)
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    _ensure_can_access(record, current_user)
+    visibility = record.get("visibility") or "public"
+    if visibility == "private":
+        raise HTTPException(status_code=400, detail="Private models cannot be shared by link")
+    record = _ensure_share_token(record)
+    share_token = str(record["share_token"])
+    return ShareLinkResponse(
+        model_version_id=model_version_id,
+        share_token=share_token,
+        share_path=f"/share/{share_token}",
+    )
+
+
+@router.get("/shared/model-versions/{share_token}", response_model=ModelVersionResponse)
+def get_shared_model_version(share_token: str) -> ModelVersionResponse:
+    record = get_model_version_by_share_token(share_token)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Shared model not found")
+    if (record.get("visibility") or "public") == "private":
+        raise HTTPException(status_code=404, detail="Shared model not found")
+    return ModelVersionResponse(**record)
+
+
+@router.get("/shared/model-versions/{share_token}/download")
+def download_shared_model_version_file(
+    share_token: str,
+    kind: str = Query(pattern="^(original|glb|thumbnail)$"),
+) -> Response:
+    record = get_model_version_by_share_token(share_token)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Shared model not found")
+    if (record.get("visibility") or "public") == "private":
+        raise HTTPException(status_code=404, detail="Shared model not found")
 
     if kind == "original":
         storage_key = record.get("storage_key_original")

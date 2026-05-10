@@ -869,6 +869,104 @@ textarea:disabled {
   width: 100%;
 }
 
+.button-share {
+  background: color-mix(in srgb, #f59e0b 14%, var(--surface));
+  border-color: color-mix(in srgb, #f59e0b 44%, var(--line));
+  color: #9a5a00;
+}
+
+.button-share:hover {
+  background: color-mix(in srgb, #f59e0b 22%, var(--surface));
+  border-color: color-mix(in srgb, #f59e0b 58%, var(--line));
+}
+
+[data-theme="dark"] .button-share {
+  background: color-mix(in srgb, #f59e0b 18%, var(--surface));
+  color: #facc15;
+}
+
+.visibility-chip {
+  border-color: color-mix(in srgb, var(--brand) 22%, var(--line));
+}
+
+.visibility-unlisted {
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface-2));
+  border-color: color-mix(in srgb, #f59e0b 34%, var(--line));
+  color: #9a5a00;
+}
+
+.visibility-private {
+  background: color-mix(in srgb, #e11d48 10%, var(--surface-2));
+  border-color: color-mix(in srgb, #e11d48 30%, var(--line));
+  color: #be123c;
+}
+
+.share-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.share-dialog-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(15 23 42 / 0.48);
+  animation: detailScrimIn 160ms ease-out both;
+}
+
+.share-dialog {
+  position: relative;
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: detailPanelIn 180ms ease-out both;
+}
+
+.share-dialog header,
+.share-dialog footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.share-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.share-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+
+.share-link-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.share-link-row input {
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 @keyframes detailScrimIn {
   from {
     opacity: 0;
@@ -2140,6 +2238,24 @@ textarea {
   .admin-category-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .share-dialog-layer {
+    align-items: end;
+    padding: 0;
+  }
+
+  .share-dialog {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+  }
+
+  .share-dialog footer {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 

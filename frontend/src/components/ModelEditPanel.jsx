@@ -1,4 +1,4 @@
-import { Save, UploadCloud, X } from "lucide-react";
+import { Eye, Save, UploadCloud, X } from "lucide-react";
 import { buildDownloadUrl } from "../lib/workspaceApi";
 
 const SOURCE_FORMATS = ["step", "stp", "iges", "igs", "3mf", "stl", "obj"];
@@ -104,6 +104,17 @@ export function ModelEditPanel({
             <label>
               Описание
               <textarea rows={4} value={draft.modelDescription} onChange={(e) => update({ modelDescription: e.target.value })} />
+            </label>
+            <label>
+              <span>
+                <Eye size={14} />
+                Видимость
+              </span>
+              <select value={draft.visibility || "public"} onChange={(e) => update({ visibility: e.target.value })}>
+                <option value="public">Публичная - видна в Explore</option>
+                <option value="unlisted">По ссылке - скрыта из Explore</option>
+                <option value="private">Приватная - только для тебя</option>
+              </select>
             </label>
           </section>
 

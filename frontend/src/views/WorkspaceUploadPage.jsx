@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileUp, ImageUp, Settings2, Tags, UploadCloud } from "lucide-react";
+import { ArrowLeft, Eye, FileUp, ImageUp, Settings2, Tags, UploadCloud } from "lucide-react";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { apiListModelCategories, apiUploadModel } from "../lib/workspaceApi";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
@@ -23,6 +23,7 @@ export function WorkspaceUploadPage() {
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [sourceFormat, setSourceFormat] = useState("step");
   const [conversionProfile, setConversionProfile] = useState("balanced");
+  const [visibility, setVisibility] = useState("public");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -73,6 +74,7 @@ export function WorkspaceUploadPage() {
         thumbnailFile,
         sourceFormat,
         conversionProfile,
+        visibility,
         file,
         token: idToken,
       });
@@ -186,6 +188,18 @@ export function WorkspaceUploadPage() {
               Теги
             </span>
             <input value={modelTags} onChange={(e) => setModelTags(e.target.value)} placeholder="clamp, printable, fixture" />
+          </label>
+
+          <label>
+            <span className="upload-label-with-icon">
+              <Eye size={14} />
+              Видимость
+            </span>
+            <select value={visibility} onChange={(e) => setVisibility(e.target.value)}>
+              <option value="public">Публичная - видна в Explore</option>
+              <option value="unlisted">По ссылке - скрыта из Explore</option>
+              <option value="private">Приватная - только для тебя</option>
+            </select>
           </label>
         </section>
 

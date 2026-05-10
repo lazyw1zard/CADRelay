@@ -19,6 +19,8 @@ MODEL_VERSION_COLUMNS = [
     "source_format",
     "conversion_profile",
     "status",
+    "visibility",
+    "share_token",
     "owner_user_id",
     "created_by_user_id",
     "updated_by_user_id",
@@ -81,6 +83,8 @@ def init_metadata_store() -> None:
                     source_format text NOT NULL,
                     conversion_profile text,
                     status text NOT NULL,
+                    visibility text NOT NULL DEFAULT 'public',
+                    share_token text,
                     owner_user_id text,
                     created_by_user_id text,
                     updated_by_user_id text,
@@ -97,6 +101,8 @@ def init_metadata_store() -> None:
                 )
                 """
             )
+            cur.execute("ALTER TABLE model_versions ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'public'")
+            cur.execute("ALTER TABLE model_versions ADD COLUMN IF NOT EXISTS share_token text")
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS approvals (
@@ -136,6 +142,14 @@ def init_metadata_store() -> None:
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_model_versions_status_created "
                 "ON model_versions(status, created_at DESC)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_model_versions_visibility_status "
+                "ON model_versions(visibility, status, created_at DESC)"
+            )
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_model_versions_share_token "
+                "ON model_versions(share_token) WHERE share_token IS NOT NULL"
             )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_saved_models_user ON saved_models(user_id)")
             cur.execute(
@@ -182,6 +196,7 @@ def get_model_version(model_version_id: str) -> dict[str, Any] | None:
 def list_model_versions(
     owner_user_id: str | None = None,
     status: str | None = None,
+    visibility: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -195,6 +210,9 @@ def list_model_versions(
     if status:
         where.append("status = %s")
         params.append(status)
+    if visibility:
+        where.append("visibility = %s")
+        params.append(visibility)
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     params.extend([safe_limit, safe_offset])
     with _connect() as conn:
@@ -209,6 +227,16 @@ def list_model_versions(
                 params,
             )
             return [_normalize_model_row(row) or row for row in cur.fetchall()]
+
+
+def get_model_version_by_share_token(share_token: str) -> dict[str, Any] | None:
+    token = share_token.strip()
+    if not token:
+        return None
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM model_versions WHERE share_token = %s", (token,))
+            return _normalize_model_row(cur.fetchone())
 
 
 def update_model_version(model_version_id: str, **updates: Any) -> dict[str, Any] | None:

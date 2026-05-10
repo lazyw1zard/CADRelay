@@ -7,6 +7,7 @@ import { ExplorePage } from "../views/ExplorePage";
 import { WorkspacePage } from "../views/WorkspacePage";
 import { WorkspaceRenderPage } from "../views/WorkspaceRenderPage";
 import { WorkspaceUploadPage } from "../views/WorkspaceUploadPage";
+import { SharedModelPage } from "../views/SharedModelPage";
 
 export function AppRouter() {
   return (
@@ -17,6 +18,7 @@ export function AppRouter() {
           <Route path="/workspace" element={<WorkspacePage />} />
           <Route path="/workspace/new" element={<WorkspaceUploadPage />} />
           <Route path="/workspace/render/:modelVersionId" element={<WorkspaceRenderPage />} />
+          <Route path="/share/:shareToken" element={<SharedModelPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/categories" element={<AdminCategoriesPage />} />
           <Route path="/auth" element={<AuthPage />} />

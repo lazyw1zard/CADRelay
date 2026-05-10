@@ -1,6 +1,9 @@
-import { ArrowRight, Download, Star, X } from "lucide-react";
+import { ArrowRight, Download, Share2, Star, X } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { buildDownloadUrl, withAuthToken } from "../lib/workspaceApi";
+import { ShareLinkDialog } from "./ShareLinkDialog";
+import { apiCreateShareLink, buildDownloadUrl, withAuthToken } from "../lib/workspaceApi";
+import { formatErrorMessage } from "../lib/errorMessages";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
@@ -46,6 +49,9 @@ export function ModelDetailPanel({
   onToggleFavorite,
   onClose,
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareError, setShareError] = useState("");
   if (!model) return null;
 
   const title = renderTitle(model);
@@ -55,6 +61,31 @@ export function ModelDetailPanel({
     idToken && model.custom_thumbnail_available
       ? withAuthToken(`${API_BASE}/model-versions/${model.id}/download?kind=thumbnail`, idToken)
       : "";
+  const visibility = model.visibility || "public";
+  const visibilityLabel =
+    visibility === "private" ? "Приватная" : visibility === "unlisted" ? "По ссылке" : "Публичная";
+
+  async function openShareDialog() {
+    setShareOpen(true);
+    setShareError("");
+    if (visibility === "private") {
+      setShareUrl("");
+      setShareError("Приватную модель нельзя открыть по ссылке. Переключи видимость на 'По ссылке'.");
+      return;
+    }
+    if (!idToken) {
+      setShareUrl(window.location.href);
+      return;
+    }
+    try {
+      const result = await apiCreateShareLink(model.id, idToken);
+      const url = new URL(result.share_path, window.location.origin);
+      setShareUrl(url.toString());
+    } catch (err) {
+      setShareUrl("");
+      setShareError(formatErrorMessage(err, "Не удалось создать ссылку."));
+    }
+  }
 
   return (
     <div className="detail-layer" role="presentation">
@@ -84,6 +115,7 @@ export function ModelDetailPanel({
           <span className={`workspace-status-chip workspace-status-${model.status || "unknown"}`}>
             {model.status || "unknown"}
           </span>
+          <span className={`filter-chip visibility-chip visibility-${visibility}`}>{visibilityLabel}</span>
           <span className="filter-chip">{(model.source_format || "cad").toUpperCase()}</span>
           {canPreview ? <span className="filter-chip">GLB ready</span> : <span className="filter-chip">Preview pending</span>}
         </div>
@@ -142,7 +174,18 @@ export function ModelDetailPanel({
               Оригинал
             </a>
           ) : null}
+          <button type="button" className="button button-share" onClick={openShareDialog}>
+            <Share2 size={16} />
+            Поделиться
+          </button>
         </footer>
+        <ShareLinkDialog
+          open={shareOpen}
+          shareUrl={shareUrl}
+          error={shareError}
+          note={visibility === "unlisted" ? "Модель не видна в Explore, но откроется у всех, у кого есть ссылка." : "Публичную модель можно отправить прямой ссылкой."}
+          onClose={() => setShareOpen(false)}
+        />
       </aside>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Save,
+  Share2,
   ShieldCheck,
   Star,
   ThumbsDown,
@@ -16,6 +17,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { ModelEditPanel } from "../components/ModelEditPanel";
+import { ShareLinkDialog } from "../components/ShareLinkDialog";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
@@ -26,6 +28,7 @@ import {
   apiDeleteModelVersion,
   apiFullUpdateModelVersion,
   apiGetModelVersion,
+  apiCreateShareLink,
   apiListModelCategories,
   apiListModelVersions,
   apiReactToModelVersion,
@@ -58,6 +61,12 @@ function formatDateTime(value) {
   });
 }
 
+function visibilityLabel(value) {
+  if (value === "private") return "Приватная";
+  if (value === "unlisted") return "По ссылке";
+  return "Публичная";
+}
+
 export function WorkspacePage() {
   const navigate = useNavigate();
   const { firebaseReady, authReady, authUser, idToken, authRole, emailVerified, authError } = useWorkspaceAuth();
@@ -79,10 +88,15 @@ export function WorkspacePage() {
     modelTags: "",
     sourceFormat: "step",
     conversionProfile: "balanced",
+    visibility: "public",
     modelFile: null,
     thumbnailFile: null,
   });
   const [editSaving, setEditSaving] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareDialogUrl, setShareDialogUrl] = useState("");
+  const [shareDialogError, setShareDialogError] = useState("");
+  const [shareDialogNote, setShareDialogNote] = useState("");
   const [reactionById, setReactionById] = useState({});
   const [reactionSavingId, setReactionSavingId] = useState("");
   const [thumbnailInProgressId, setThumbnailInProgressId] = useState("");
@@ -239,6 +253,7 @@ export function WorkspacePage() {
       modelTags: formatTagsInput(model.model_tags),
       sourceFormat: model.source_format || "step",
       conversionProfile: model.conversion_profile || "balanced",
+      visibility: model.visibility || "public",
       modelFile: null,
       thumbnailFile: null,
     });
@@ -253,6 +268,7 @@ export function WorkspacePage() {
       modelTags: "",
       sourceFormat: "step",
       conversionProfile: "balanced",
+      visibility: "public",
       modelFile: null,
       thumbnailFile: null,
     });
@@ -282,6 +298,7 @@ export function WorkspacePage() {
         modelTags: editDraft.modelTags,
         sourceFormat: editDraft.sourceFormat,
         conversionProfile: editDraft.conversionProfile,
+        visibility: editDraft.visibility,
         file: editDraft.modelFile,
         thumbnailFile: editDraft.thumbnailFile,
       });
@@ -322,6 +339,29 @@ export function WorkspacePage() {
       setError(formatErrorMessage(err, "Не удалось сохранить оценку модели."));
     } finally {
       setReactionSavingId("");
+    }
+  }
+
+  async function shareModel(model) {
+    setShareDialogOpen(true);
+    setShareDialogUrl("");
+    setShareDialogError("");
+    if ((model.visibility || "public") === "private") {
+      setShareDialogNote("Приватная модель доступна только тебе. Чтобы поделиться, измени видимость на 'По ссылке'.");
+      setShareDialogError("Ссылка для приватной модели отключена.");
+      return;
+    }
+    setShareDialogNote(
+      (model.visibility || "public") === "unlisted"
+        ? "Модель скрыта из Explore, но откроется у всех, у кого есть ссылка."
+        : "Публичная модель также видна в Explore."
+    );
+    try {
+      const result = await apiCreateShareLink(model.id, idToken);
+      const url = new URL(result.share_path, window.location.origin);
+      setShareDialogUrl(url.toString());
+    } catch (err) {
+      setShareDialogError(formatErrorMessage(err, "Не удалось создать ссылку."));
     }
   }
 
@@ -717,6 +757,9 @@ export function WorkspacePage() {
                   {r.model_description ? <p>{r.model_description}</p> : <p>{(r.source_format || "cad").toUpperCase()}</p>}
                   <div className="model-card-meta">
                     <span className={`workspace-status-chip workspace-status-${r.status || "unknown"}`}>{r.status || "unknown"}</span>
+                    <span className={`filter-chip visibility-chip visibility-${r.visibility || "public"}`}>
+                      {visibilityLabel(r.visibility)}
+                    </span>
                     <span>{r.model_category || "uncategorized"}</span>
                   </div>
                   {Array.isArray(r.model_tags) && r.model_tags.length > 0 ? (
@@ -786,6 +829,10 @@ export function WorkspacePage() {
                           <Edit3 size={14} />
                           Редактировать
                         </button>
+                        <button type="button" onClick={() => shareModel(r)}>
+                          <Share2 size={14} />
+                          Поделиться
+                        </button>
                         <button
                           type="button"
                           className="workspace-menu-danger"
@@ -820,6 +867,13 @@ export function WorkspacePage() {
         onClose={cancelEditModel}
         onSave={saveEditedModel}
         saving={editSaving}
+      />
+      <ShareLinkDialog
+        open={shareDialogOpen}
+        shareUrl={shareDialogUrl}
+        note={shareDialogNote}
+        error={shareDialogError}
+        onClose={() => setShareDialogOpen(false)}
       />
     </main>
   );
