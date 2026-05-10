@@ -32,7 +32,7 @@ function isFirebaseConfigured() {
 
 function getAuthMode() {
   if (AUTH_MODE === "postgres" || AUTH_MODE === "firebase") return AUTH_MODE;
-  return "firebase";
+  return "postgres";
 }
 
 function readPostgresSession() {

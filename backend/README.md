@@ -118,6 +118,13 @@ Frontend env:
 VITE_AUTH_MODE=postgres
 ```
 
+For production frontend builds, prefer the dedicated script so the auth mode is
+baked into the Vite bundle:
+
+```bash
+npm run build:postgres
+```
+
 Notes:
 - First registered Postgres user becomes `admin`; later users default to `editor`.
 - `CADRELAY_BOOTSTRAP_ADMIN_EMAILS=email@example.com,other@example.com` can grant admin

@@ -51,4 +51,4 @@
 ### D-011: Postgres auth migration path
 - Decision: add `CADRELAY_AUTH_MODE=postgres` beside existing Firebase/disabled modes.
 - Rationale: move user identity and roles into the self-hosted Postgres stack before public data accumulates.
-- Consequence: Firebase stays available during transition; production switches only after frontend `VITE_AUTH_MODE=postgres` and backend env are enabled together.
+- Consequence: MakeLayer production uses Postgres auth; Firebase stays available only by explicit `VITE_AUTH_MODE=firebase` opt-in during transition.

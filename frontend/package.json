@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:postgres": "vite build --mode postgres",
     "preview": "vite preview"
   },
   "dependencies": {
