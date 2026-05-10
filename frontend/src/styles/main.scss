@@ -160,6 +160,60 @@ textarea:disabled {
   color: #8be4d1;
 }
 
+.brand-mark {
+  display: block;
+  overflow: visible;
+}
+
+.brand-mark-shadow {
+  fill: rgba(2, 8, 23, 0.18);
+  transform: translateY(3px);
+}
+
+.brand-mark-layer {
+  stroke: #061b32;
+  stroke-width: 4.2;
+  stroke-linejoin: round;
+}
+
+.brand-mark-layer-bottom {
+  fill: #12856f;
+}
+
+.brand-mark-layer-mid {
+  fill: #32b7a0;
+}
+
+.brand-mark-layer-top {
+  fill: #56d4bd;
+}
+
+.brand-mark-edge {
+  fill: none;
+  stroke: rgba(6, 27, 50, 0.72);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+.brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--text);
+  font: inherit;
+  font-weight: 820;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.brand-wordmark span:last-child {
+  color: var(--brand);
+}
+
+.brand-wordmark-compact {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .shell-brand-name,
 .shell-brand-caption {
   display: block;
@@ -168,6 +222,10 @@ textarea:disabled {
 .shell-brand-name {
   font-size: 18px;
   font-weight: 780;
+}
+
+.shell-brand-name .brand-wordmark {
+  color: var(--sidebar-text);
 }
 
 .shell-brand-caption {
@@ -473,16 +531,36 @@ textarea:disabled {
 }
 
 .explore-hero {
-  padding: 18px;
+  padding: 24px 22px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
-  align-items: end;
+  align-items: center;
+  overflow: hidden;
 }
 
 .explore-hero h1 {
-  margin: 0 0 8px;
-  font-size: clamp(26px, 4vw, 34px);
+  margin: 0 0 10px;
+  font-size: clamp(40px, 6vw, 74px);
+  line-height: 0.95;
+}
+
+.explore-brand-lockup {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.5vw, 28px);
+}
+
+.explore-brand-mark {
+  flex: 0 0 auto;
+  width: clamp(62px, 7.5vw, 92px);
+  height: auto;
+  filter: drop-shadow(0 16px 22px rgba(6, 27, 50, 0.16));
+}
+
+.explore-brand-lockup .page-kicker {
+  margin-bottom: 6px;
 }
 
 .explore-hero p {
@@ -2139,6 +2217,23 @@ textarea {
     align-items: stretch;
   }
 
+  .explore-hero {
+    padding: 20px;
+  }
+
+  .explore-brand-lockup {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .explore-brand-mark {
+    width: 56px;
+  }
+
+  .explore-hero h1 {
+    font-size: clamp(34px, 12vw, 50px);
+  }
+
   .page-actions,
   .explore-hero-actions,
   .workspace-actions-right {
@@ -2338,6 +2433,19 @@ textarea {
   .explore-hero h1,
   .workspace-page > h1 {
     font-size: 25px;
+  }
+
+  .explore-brand-lockup {
+    display: grid;
+    gap: 10px;
+  }
+
+  .explore-brand-mark {
+    width: 50px;
+  }
+
+  .explore-hero h1 {
+    font-size: 36px;
   }
 
   .metric-strip,

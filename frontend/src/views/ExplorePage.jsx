@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, RefreshCw, Search, Star, UploadCloud } from "lucide-react";
+import { BrandMark, MakeLayerWordmark } from "../components/BrandMark";
 import { ModelDetailPanel } from "../components/ModelDetailPanel";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
@@ -242,10 +243,15 @@ export function ExplorePage() {
   return (
     <div className="page page-wide explore-page">
       <section className="explore-hero">
-        <div>
-          <p className="page-kicker">Model library</p>
-          <h1>Explore Models</h1>
-          <p>Готовые модели для просмотра, обмена и проверки рендера. 3D-print профиль оставим как следующий слой продукта.</p>
+        <div className="explore-brand-lockup">
+          <BrandMark size={82} className="explore-brand-mark" />
+          <div>
+            <p className="page-kicker">Model library</p>
+            <h1>
+              <MakeLayerWordmark />
+            </h1>
+            <p>Готовые модели для просмотра, обмена и проверки рендера. 3D-print профиль оставим как следующий слой продукта.</p>
+          </div>
         </div>
         <div className="explore-hero-actions">
           <Link to="/workspace" className="btn-primary">

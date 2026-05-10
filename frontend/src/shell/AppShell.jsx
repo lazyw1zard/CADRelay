@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  Box,
   Boxes,
   FolderKanban,
   LogIn,
@@ -14,6 +13,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
+import { BrandMark, MakeLayerWordmark } from "../components/BrandMark";
 import {
   getCurrentIdTokenResult,
   getFirebaseConfigStatus,
@@ -97,10 +97,12 @@ export function AppShell() {
       <aside className={`shell-sidebar ${mobileMenuOpen ? "shell-sidebar-open" : ""}`}>
         <NavLink to="/" className="shell-brand">
           <span className="shell-brand-mark">
-            <Box size={20} strokeWidth={2.1} />
+            <BrandMark size={28} />
           </span>
           <span>
-            <span className="shell-brand-name">MakeLayer</span>
+            <span className="shell-brand-name">
+              <MakeLayerWordmark compact />
+            </span>
             <span className="shell-brand-caption">3D model exchange</span>
           </span>
         </NavLink>
