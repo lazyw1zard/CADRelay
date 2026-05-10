@@ -5,6 +5,7 @@ from app.api.v1.routes import router as api_router
 from app.core.config import settings
 from app.services.metadata_store import init_metadata_store
 from app.services.postgres_auth import init_auth_store
+from app.services.storage_store import init_storage_store
 
 app = FastAPI(title="MakeLayer API", version="0.1.0")
 app.add_middleware(
@@ -22,6 +23,7 @@ app.include_router(api_router, prefix="/api/v1")
 def startup() -> None:
     # При старте подготавливаем локальное хранилище метаданных.
     init_metadata_store()
+    init_storage_store()
     if settings.auth_mode == "postgres":
         init_auth_store()
 

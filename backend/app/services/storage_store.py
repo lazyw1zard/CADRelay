@@ -33,6 +33,13 @@ def _backend_module():
     return local_storage
 
 
+def init_storage_store() -> None:
+    if settings.storage_backend == "firebase":
+        _ensure_firebase_storage_env()
+        return
+    local_storage.init_storage()
+
+
 def save_original_bytes(model_version_id: str, filename: str, payload: bytes) -> tuple[str, str, int]:
     return _backend_module().save_original_bytes(model_version_id, filename, payload)
 

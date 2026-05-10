@@ -29,6 +29,7 @@ Linux/macOS:
 ## Notes
 - Local MVP adapters write runtime data to `backend/data/`.
 - This data directory is ignored by git and will be replaced with Firestore + object storage adapters later.
+- Local storage uses `storage/originals`, `storage/glb`, and `storage/thumbnails`; the service user must own these directories in production.
 - By default backend auto-triggers one worker run after each upload.
 - To disable this behavior set `CADRELAY_AUTO_WORKER_ENABLED=false` in `backend/.env`.
 - Supported upload formats: `step`, `stp`, `iges`, `igs`, `3mf`, `stl`, `obj`.

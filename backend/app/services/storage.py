@@ -11,6 +11,12 @@ def _safe_filename(name: str) -> str:
     return "".join(ch for ch in name if ch.isalnum() or ch in {"-", "_", "."}) or "upload.step"
 
 
+def init_storage() -> None:
+    # Local storage должен быть готов до первого upload, включая 3MF embedded thumbnails.
+    for directory in (settings.originals_dir, settings.glb_dir, settings.thumbnails_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+
 def save_original_bytes(model_version_id: str, filename: str, payload: bytes) -> tuple[str, str, int]:
     # Сохраняем исходный CAD-файл и возвращаем его ключ + контрольную сумму + размер.
     safe_name = _safe_filename(filename)

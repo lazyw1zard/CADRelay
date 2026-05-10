@@ -17,6 +17,7 @@ class Settings:
         self.storage_dir = self.data_dir / "storage"
         self.originals_dir = self.storage_dir / "originals"
         self.glb_dir = self.storage_dir / "glb"
+        self.thumbnails_dir = self.storage_dir / "thumbnails"
         self.metadata_file = self.data_dir / "metadata.json"
         self.queue_file = self.data_dir / "queue.json"
         # local | redis | sqs

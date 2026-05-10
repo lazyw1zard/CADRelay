@@ -27,6 +27,7 @@ def isolated_local_runtime(tmp_path: Path):
         "storage_dir": settings.storage_dir,
         "originals_dir": settings.originals_dir,
         "glb_dir": settings.glb_dir,
+        "thumbnails_dir": settings.thumbnails_dir,
         "metadata_file": settings.metadata_file,
         "queue_file": settings.queue_file,
         "metadata_backend": settings.metadata_backend,
@@ -43,6 +44,7 @@ def isolated_local_runtime(tmp_path: Path):
     settings.storage_dir = storage_dir
     settings.originals_dir = storage_dir / "originals"
     settings.glb_dir = storage_dir / "glb"
+    settings.thumbnails_dir = storage_dir / "thumbnails"
     settings.metadata_file = data_dir / "metadata.json"
     settings.queue_file = data_dir / "queue.json"
     settings.metadata_backend = "local"
@@ -60,6 +62,7 @@ def isolated_local_runtime(tmp_path: Path):
         settings.storage_dir = snapshot["storage_dir"]
         settings.originals_dir = snapshot["originals_dir"]
         settings.glb_dir = snapshot["glb_dir"]
+        settings.thumbnails_dir = snapshot["thumbnails_dir"]
         settings.metadata_file = snapshot["metadata_file"]
         settings.queue_file = snapshot["queue_file"]
         settings.metadata_backend = snapshot["metadata_backend"]
