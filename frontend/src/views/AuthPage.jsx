@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { LogIn, UserPlus } from "lucide-react";
+import { BrandMark } from "../components/BrandMark";
 import {
   getFirebaseConfigStatus,
   getAuthMode,
@@ -26,6 +27,7 @@ export function AuthPage() {
   const [info, setInfo] = useState("");
   const [authReady, setAuthReady] = useState(!firebaseReady);
   const [authUser, setAuthUser] = useState(null);
+  const isSignup = authMode === "signup";
 
   useEffect(() => {
     // Если пользователь уже вошел, страницу логина не показываем.
@@ -108,34 +110,54 @@ export function AuthPage() {
 
   return (
     <section className="auth-page-card">
-      <h1>Sign in / Sign up</h1>
-      <p className="muted">Войди, чтобы получить доступ к загрузке и управлению моделями.</p>
+      <div className="auth-page-header">
+        <BrandMark size={48} className="auth-page-mark" />
+        <div>
+          <p className="page-kicker">Account</p>
+          <h1>{isSignup ? "Создать аккаунт" : "Войти в MakeLayer"}</h1>
+          <p className="muted">Доступ к загрузке, управлению моделями и приватным ссылкам.</p>
+        </div>
+      </div>
 
       <form className="auth-page-form" onSubmit={handleSubmit}>
         <div className="auth-page-mode">
           <button
             type="button"
             className={authMode === "signin" ? "auth-mode-active" : "auth-mode-idle"}
-            onClick={() => setAuthMode("signin")}
+            onClick={() => {
+              setAuthMode("signin");
+              setError("");
+              setInfo("");
+            }}
           >
-            Sign in
+            Войти
           </button>
           <button
             type="button"
             className={authMode === "signup" ? "auth-mode-active" : "auth-mode-idle"}
-            onClick={() => setAuthMode("signup")}
+            onClick={() => {
+              setAuthMode("signup");
+              setError("");
+              setInfo("");
+            }}
           >
-            Sign up
+            Регистрация
           </button>
         </div>
 
         <label>
           Email
-          <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@example.com"
+          />
         </label>
 
         <label>
-          Password
+          Пароль
           <input
             type="password"
             autoComplete={authMode === "signup" ? "new-password" : "current-password"}
@@ -146,21 +168,21 @@ export function AuthPage() {
 
         {authMode === "signup" ? (
           <label>
-            Display name
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Например: Denis" />
+            Логин
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
           </label>
         ) : null}
 
         {authMode === "signup" ? (
           <label>
-            Confirm password
+            Повтори пароль
             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           </label>
         ) : null}
 
-        <button type="submit" disabled={busy}>
+        <button className="auth-submit" type="submit" disabled={busy}>
           {authMode === "signup" ? <UserPlus size={16} /> : <LogIn size={16} />}
-          {busy ? "Обработка..." : authMode === "signup" ? "Create account" : "Sign in"}
+          {busy ? "Обработка..." : authMode === "signup" ? "Создать аккаунт" : "Войти"}
         </button>
       </form>
 

@@ -250,7 +250,7 @@ export function ExplorePage() {
             <h1>
               <MakeLayerWordmark />
             </h1>
-            <p>Готовые модели для просмотра, обмена и проверки рендера. 3D-print профиль оставим как следующий слой продукта.</p>
+            <p>Готовые модели для просмотра, обмена и проверки рендера.</p>
           </div>
         </div>
         <div className="explore-hero-actions">

@@ -32,6 +32,9 @@
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 12px;
+  --motion-fast: 140ms ease;
+  --motion-base: 180ms ease;
+  --motion-slow: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --font-main: "Inter", "Manrope", "Segoe UI", system-ui, sans-serif;
 }
 
@@ -93,6 +96,15 @@ textarea {
 
 a {
   color: var(--link);
+  transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast);
+}
+
+button,
+input,
+select,
+textarea {
+  transition: background-color var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast),
+    color var(--motion-fast), transform var(--motion-fast), opacity var(--motion-fast);
 }
 
 button:disabled,
@@ -299,28 +311,6 @@ textarea:disabled {
   gap: 10px;
 }
 
-.shell-product-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0 12px;
-  color: var(--text-soft);
-  background: var(--surface-2);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 16%, transparent);
-}
-
 .icon-btn,
 .shell-auth-btn,
 .btn-primary,
@@ -403,6 +393,7 @@ textarea:disabled {
 .page {
   width: min(100%, 1280px);
   margin: 0 auto;
+  animation: pageEnter var(--motion-slow) both;
 }
 
 .page-wide {
@@ -456,6 +447,8 @@ textarea:disabled {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+  transition: background-color var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base),
+    transform var(--motion-base);
 }
 
 .card,
@@ -628,11 +621,12 @@ textarea:disabled {
   background: var(--surface);
   box-shadow: var(--shadow-soft);
   min-width: 0;
+  transition: border-color var(--motion-base), box-shadow var(--motion-base), transform var(--motion-base),
+    background-color var(--motion-base);
 }
 
 .model-card-clickable {
   cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
 .model-card-clickable:hover {
@@ -1045,6 +1039,39 @@ textarea:disabled {
   background: transparent;
 }
 
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes surfaceEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes popoverIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes detailScrimIn {
   from {
     opacity: 0;
@@ -1072,7 +1099,10 @@ textarea:disabled {
 }
 
 .auth-page-card {
-  max-width: 520px;
+  width: min(100%, 560px);
+  max-width: 560px;
+  padding: 22px;
+  animation: surfaceEnter var(--motion-slow) both;
 }
 
 .auth-page-card h1,
@@ -1080,10 +1110,41 @@ textarea:disabled {
   margin: 0;
 }
 
+.auth-page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.auth-page-mark {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  filter: drop-shadow(0 12px 18px rgba(6, 27, 50, 0.13));
+}
+
+.auth-page-card h1 {
+  margin: 2px 0 6px;
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.05;
+}
+
+.auth-page-card .muted {
+  color: var(--text-soft);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
 .auth-page-form,
 .workspace-page form.card {
   display: grid;
   gap: 12px;
+}
+
+.auth-page-form {
+  gap: 14px;
 }
 
 label {
@@ -1109,6 +1170,25 @@ textarea {
 textarea {
   resize: vertical;
   line-height: 1.45;
+}
+
+.auth-page-form label {
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.auth-page-form input {
+  min-height: 46px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
+}
+
+.auth-page-form input:focus {
+  border-color: color-mix(in srgb, var(--brand) 54%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent);
+  outline: none;
 }
 
 .auth-page-form button,
@@ -1150,17 +1230,36 @@ textarea {
   gap: 8px;
 }
 
+.auth-page-mode {
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.auth-page-mode button {
+  min-height: 40px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .auth-page-mode .auth-mode-idle,
 .workspace-page .auth-mode button.auth-mode-idle {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text-soft);
 }
 
 .auth-page-mode .auth-mode-active,
 .workspace-page .auth-mode button.auth-mode-active {
-  background: var(--brand-soft);
+  background: var(--surface);
   border-color: color-mix(in srgb, var(--brand) 36%, var(--line));
   color: var(--brand);
+  box-shadow: var(--shadow-soft);
+}
+
+.auth-submit {
+  margin-top: 4px;
+  min-height: 48px;
 }
 
 .workspace-page {
@@ -1664,11 +1763,14 @@ textarea {
   background: var(--surface);
   box-shadow: var(--shadow);
   padding: 6px;
+  transform-origin: top left;
+  animation: popoverIn 150ms ease-out both;
 }
 
 .workspace-menu-right .workspace-menu-popover {
   right: 0;
   left: auto;
+  transform-origin: top right;
 }
 
 .workspace-menu-popover a,
@@ -1806,6 +1908,9 @@ textarea {
   background: var(--surface);
   box-shadow: var(--shadow-soft);
   padding: 18px;
+  animation: surfaceEnter var(--motion-slow) both;
+  transition: background-color var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base),
+    transform var(--motion-base);
 }
 
 .upload-main-panel,
@@ -2199,12 +2304,6 @@ textarea {
     padding: 9px 12px;
   }
 
-  .shell-product-status {
-    max-width: 148px;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-
   .shell-auth-btn span {
     display: none;
   }
@@ -2404,19 +2503,28 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .detail-scrim,
   .model-detail-panel,
+  .share-dialog,
+  .share-dialog-scrim,
+  .workspace-menu-popover,
+  .auth-page-card,
+  .page,
+  .upload-main-panel,
+  .upload-side-section,
+  .upload-submit-panel,
   .explore-grid-filter-leave .model-card,
   .explore-grid-filter-enter .model-card {
     animation: none;
-  }
-
-  .model-card-clickable,
-  .icon-btn,
-  .shell-auth-btn,
-  .btn-ghost,
-  .button {
-    transition: none;
   }
 }
 

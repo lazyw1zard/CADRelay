@@ -155,10 +155,6 @@ export function AppShell() {
             >
               {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
-            <div className="shell-product-status">
-              <span className="status-dot" />
-              <span>MVP</span>
-            </div>
           </div>
           <div className="shell-topbar-actions">
             <button
