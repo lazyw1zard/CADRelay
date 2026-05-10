@@ -8,6 +8,7 @@ from fastapi import Depends, Header, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
+from app.services.postgres_auth import get_user_by_session_token
 
 security = HTTPBearer(auto_error=False)
 ALLOWED_ROLES = {"viewer", "editor", "reviewer", "admin"}
@@ -87,7 +88,7 @@ def get_current_user(
     access_token: str | None = Query(default=None),
 ) -> CurrentUser:
     # Disabled mode оставляет текущий MVP-поток без login UI.
-    if settings.auth_mode != "firebase":
+    if settings.auth_mode == "disabled":
         user_id = (x_demo_user_id or "demo_user").strip() or "demo_user"
         return CurrentUser(
             user_id=user_id,
@@ -100,6 +101,21 @@ def get_current_user(
     bearer_token = token.credentials if token and token.credentials else (access_token or "").strip()
     if not bearer_token:
         raise HTTPException(status_code=401, detail="Authorization bearer token is required")
+
+    if settings.auth_mode == "postgres":
+        user = get_user_by_session_token(bearer_token)
+        if user is None:
+            raise HTTPException(status_code=401, detail="Invalid session token")
+        return CurrentUser(
+            user_id=str(user["uid"]),
+            role=str(user.get("role") or "editor"),
+            email_verified=bool(user.get("email_verified")),
+            auth_provider="postgres",
+            auth_subject=str(user["uid"]),
+        )
+
+    if settings.auth_mode != "firebase":
+        raise HTTPException(status_code=503, detail=f"Unsupported auth mode: {settings.auth_mode}")
 
     _init_firebase_if_needed()
     assert _firebase_auth_module is not None

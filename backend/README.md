@@ -98,6 +98,32 @@ cd C:\Projects\CADRelay\backend
 ## Auth mode (MVP)
 By default auth is disabled (`CADRELAY_AUTH_MODE=disabled`) to keep local flow simple.
 
+### Postgres auth
+Postgres auth is the planned MakeLayer production path. It uses `app_users` and
+`app_sessions` tables in the same Postgres database as metadata. Session tokens are opaque:
+the client stores the token, while Postgres stores only its SHA-256 hash.
+
+Backend env:
+
+```env
+CADRELAY_AUTH_MODE=postgres
+CADRELAY_POSTGRES_DSN=postgresql://cadrelay:cadrelay_dev@127.0.0.1:5432/cadrelay_dev
+CADRELAY_AUTH_SESSION_DAYS=30
+```
+
+Frontend env:
+
+```env
+VITE_AUTH_MODE=postgres
+```
+
+Notes:
+- First registered Postgres user becomes `admin`; later users default to `editor`.
+- `CADRELAY_BOOTSTRAP_ADMIN_EMAILS=email@example.com,other@example.com` can grant admin
+  to known emails during rollout.
+- Email verification is treated as true until a mail provider is connected.
+
+### Firebase auth
 To enable Firebase token verification:
 
 ```env

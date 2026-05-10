@@ -38,10 +38,11 @@
   - [x] add local `metadata.json` to Postgres migration script
   - [ ] run live Postgres dev verification once a local/VPS database is available
   - [ ] add versioned migrations before public production data accumulates
-  - [ ] move users into Postgres-backed app table
-  - keep Firebase Auth working during the transition
-  - add simple backend email/password auth after Postgres metadata is stable
-  - migrate role/email verification semantics from Firebase claims to Postgres-backed users
+  - [x] move users into Postgres-backed app table
+  - [x] keep Firebase Auth working during the transition
+  - [x] add simple backend email/password auth after Postgres metadata is stable
+  - [x] migrate role/email verification semantics from Firebase claims to Postgres-backed users
+  - [ ] enable `CADRELAY_AUTH_MODE=postgres` + `VITE_AUTH_MODE=postgres` on production after final manual signup/login/delete-account check
   - disable Firebase Auth only after the new auth path is tested end-to-end
 - [x] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic):
   - local queue backend works in MVP

@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { LogIn, UserPlus } from "lucide-react";
 import {
   getFirebaseConfigStatus,
+  getAuthMode,
   getCurrentIdTokenResult,
   signInEmailPassword,
   signUpEmailPassword,
@@ -12,6 +13,7 @@ import { formatErrorMessage } from "../lib/errorMessages";
 
 export function AuthPage() {
   const firebaseReady = getFirebaseConfigStatus();
+  const authProvider = getAuthMode();
   const navigate = useNavigate();
 
   const [authMode, setAuthMode] = useState("signin");
@@ -62,7 +64,12 @@ export function AuthPage() {
     try {
       if (authMode === "signup") {
         await signUpEmailPassword(cleanedEmail, password, displayName);
-        setInfo("Аккаунт создан. Проверь почту и подтверди email, затем войди.");
+        if (authProvider === "postgres") {
+          setInfo("Аккаунт создан.");
+          navigate("/workspace");
+        } else {
+          setInfo("Аккаунт создан. Проверь почту и подтверди email, затем войди.");
+        }
       } else {
         await signInEmailPassword(cleanedEmail, password);
         const tokenResult = await getCurrentIdTokenResult();
@@ -83,7 +90,7 @@ export function AuthPage() {
     return (
       <section className="auth-page-card">
         <h1>Auth</h1>
-        <p>Firebase config не найден. Добавь VITE_FIREBASE_* в frontend/.env.local.</p>
+        <p>Auth config не найден. Проверь настройки VITE_AUTH_MODE или VITE_FIREBASE_*.</p>
       </section>
     );
   }

@@ -6,15 +6,19 @@ import re
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import Response
 
-from app.core.auth import CurrentUser, get_current_user
+from app.core.auth import CurrentUser, get_current_user, security
 from app.core.config import settings
 from app.schemas.models import (
     AdminRoleUpdateRequest,
     AdminUserListResponse,
     AdminUserResponse,
     ApprovalDecision,
+    AuthLoginRequest,
+    AuthSessionResponse,
+    AuthSignupRequest,
     ExploreModelCardResponse,
     ExploreModelListResponse,
     ModelCategoryCreate,
@@ -24,6 +28,7 @@ from app.schemas.models import (
     ModelVersionResponse,
     ModelVersionUpdate,
     ModelReactionDecision,
+    ProfileUpdateRequest,
     SavedModelListResponse,
     UploadResponse,
 )
@@ -45,6 +50,16 @@ from app.services.metadata_store import (
     update_model_category,
     update_model_version,
 )
+from app.services.postgres_auth import (
+    create_user_session,
+    delete_user as delete_postgres_user,
+    get_user as get_postgres_user,
+    list_users as list_postgres_users,
+    login_user_session,
+    revoke_user_session,
+    set_user_role as set_postgres_user_role,
+    update_user_display_name,
+)
 from app.services.queue import enqueue_conversion, remove_messages_for_model
 from app.services.storage_store import delete_bytes, load_bytes, save_original_bytes, save_thumbnail_bytes
 from app.services.three_mf import extract_thumbnail_from_3mf
@@ -60,6 +75,10 @@ ROLE_REVIEW = {"editor", "reviewer", "admin"}
 ROLE_ADMIN = {"admin"}
 ALLOWED_THUMBNAIL_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 ALLOWED_THUMBNAIL_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
+
+
+def _is_user_auth_enforced() -> bool:
+    return settings.auth_mode in {"firebase", "postgres"}
 
 
 def _ensure_role(current_user: CurrentUser, allowed: set[str]) -> None:
@@ -81,7 +100,7 @@ def _resolve_user_fields(
     auth_subject: str | None,
     actor: CurrentUser,
 ) -> tuple[str, str, str, str]:
-    if settings.auth_mode == "firebase":
+    if _is_user_auth_enforced():
         owner = actor.user_id
         creator = actor.user_id
         provider = actor.auth_provider
@@ -170,6 +189,75 @@ def _delete_storage_keys(keys: list[str | None]) -> None:
         except Exception:
             # Storage cleanup is best-effort: metadata update already points to the new artifact.
             pass
+
+
+@router.post("/auth/signup", response_model=AuthSessionResponse)
+def signup(payload: AuthSignupRequest) -> AuthSessionResponse:
+    if settings.auth_mode != "postgres":
+        raise HTTPException(status_code=503, detail="Postgres auth is not enabled")
+    try:
+        result = create_user_session(
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.display_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AuthSessionResponse(**result)
+
+
+@router.post("/auth/login", response_model=AuthSessionResponse)
+def login(payload: AuthLoginRequest) -> AuthSessionResponse:
+    if settings.auth_mode != "postgres":
+        raise HTTPException(status_code=503, detail="Postgres auth is not enabled")
+    try:
+        result = login_user_session(email=payload.email, password=payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return AuthSessionResponse(**result)
+
+
+@router.get("/auth/me", response_model=AdminUserResponse)
+def get_me(current_user: CurrentUser = Depends(get_current_user)) -> AdminUserResponse:
+    if settings.auth_mode == "postgres":
+        row = get_postgres_user(current_user.user_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return AdminUserResponse(**row)
+    return AdminUserResponse(
+        uid=current_user.user_id,
+        email=None,
+        display_name=None,
+        disabled=False,
+        email_verified=current_user.email_verified,
+        role=current_user.role,  # type: ignore[arg-type]
+    )
+
+
+@router.post("/auth/logout")
+def logout(token: HTTPAuthorizationCredentials | None = Depends(security)) -> dict[str, str]:
+    if settings.auth_mode == "postgres" and token and token.credentials:
+        revoke_user_session(token.credentials)
+    return {"status": "ok"}
+
+
+@router.patch("/me/profile", response_model=AdminUserResponse)
+def update_current_user_profile(
+    payload: ProfileUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AdminUserResponse:
+    if settings.auth_mode != "postgres":
+        raise HTTPException(status_code=503, detail="Profile updates are handled by auth provider")
+    row = update_user_display_name(current_user.user_id, payload.display_name)
+    if row is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return AdminUserResponse(**row)
 
 
 @router.post("/uploads", response_model=UploadResponse)
@@ -365,7 +453,7 @@ def list_model_versions_endpoint(
 ) -> list[ModelVersionResponse]:
     _ensure_role(current_user, ROLE_VIEW)
     # В auth-режиме по умолчанию показываем только свои модели.
-    if settings.auth_mode == "firebase" and not current_user.is_admin:
+    if _is_user_auth_enforced() and not current_user.is_admin:
         owner_filter = current_user.user_id
     else:
         owner_filter = owner_user_id
@@ -769,6 +857,8 @@ def delete_current_user_endpoint(
             delete_auth_user(current_user.user_id)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to delete Firebase user: {exc}") from exc
+    elif settings.auth_mode == "postgres":
+        delete_postgres_user(current_user.user_id)
 
     return {"status": "deleted", "deleted_models": deleted_models}
 
@@ -875,12 +965,15 @@ def admin_list_users(
     page_token: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> AdminUserListResponse:
-    # Админ читает список пользователей из Firebase Auth.
+    # Админ читает список пользователей из активного auth-провайдера.
     _ensure_role(current_user, ROLE_ADMIN)
     # Доступ к админке разрешаем только верифицированному админу.
     _ensure_email_verified(current_user)
     try:
-        result = list_auth_users(limit=limit, page_token=page_token)
+        if settings.auth_mode == "postgres":
+            result = list_postgres_users(limit=limit, page_token=page_token)
+        else:
+            result = list_auth_users(limit=limit, page_token=page_token)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     users = [AdminUserResponse(**row) for row in result.get("users", [])]
@@ -893,12 +986,15 @@ def admin_set_user_role(
     payload: AdminRoleUpdateRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> AdminUserResponse:
-    # Админ назначает роль через Firebase custom claims.
+    # Админ назначает роль через активный auth-провайдер.
     _ensure_role(current_user, ROLE_ADMIN)
     # Изменение ролей тоже под verify email.
     _ensure_email_verified(current_user)
     try:
-        row = set_auth_user_role(uid=uid, role=payload.role)
+        if settings.auth_mode == "postgres":
+            row = set_postgres_user_role(uid, payload.role)
+        else:
+            row = set_auth_user_role(uid=uid, role=payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:

@@ -107,19 +107,40 @@ class ModelReactionDecision(BaseModel):
     decision: Literal["like", "dislike"]
 
 
+class AuthSignupRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=6, max_length=256)
+    display_name: str | None = Field(default=None, max_length=80)
+
+
+class AuthLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=6, max_length=256)
+
+
 class AdminRoleUpdateRequest(BaseModel):
     # Новая роль пользователя, которую задает администратор.
     role: Literal["viewer", "editor", "reviewer", "admin"]
 
 
 class AdminUserResponse(BaseModel):
-    # UID из Firebase Auth.
+    # UID из активного auth-провайдера.
     uid: str
     email: str | None = None
     display_name: str | None = None
     disabled: bool = False
     email_verified: bool = False
     role: Literal["viewer", "editor", "reviewer", "admin"]
+
+
+class AuthSessionResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: AdminUserResponse
+
+
+class ProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
 
 
 class AdminUserListResponse(BaseModel):

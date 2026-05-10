@@ -37,9 +37,15 @@ class Settings:
         self.firebase_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
         self.firebase_storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
         self.google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-        # disabled | firebase
+        # disabled | firebase | postgres
         self.auth_mode = os.getenv("CADRELAY_AUTH_MODE", "disabled").strip().lower()
         self.firebase_auth_credentials = os.getenv("FIREBASE_AUTH_CREDENTIALS", "").strip()
+        self.auth_session_days = int(os.getenv("CADRELAY_AUTH_SESSION_DAYS", "30"))
+        self.bootstrap_admin_emails = {
+            email.strip().lower()
+            for email in os.getenv("CADRELAY_BOOTSTRAP_ADMIN_EMAILS", "").split(",")
+            if email.strip()
+        }
 
 
 settings = Settings()

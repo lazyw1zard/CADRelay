@@ -47,3 +47,8 @@
 - Decision: use `MakeLayer` as the public product/domain name.
 - Rationale: better fit for a model-sharing and 3D-printing-adjacent product; domain `makelayer.org` is active.
 - Consequence: visible UI/docs use MakeLayer, while repository paths, env prefixes and package names keep `CADRelay` until a deliberate internal rename.
+
+### D-011: Postgres auth migration path
+- Decision: add `CADRELAY_AUTH_MODE=postgres` beside existing Firebase/disabled modes.
+- Rationale: move user identity and roles into the self-hosted Postgres stack before public data accumulates.
+- Consequence: Firebase stays available during transition; production switches only after frontend `VITE_AUTH_MODE=postgres` and backend env are enabled together.
