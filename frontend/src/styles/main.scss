@@ -2472,6 +2472,11 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .detail-actions {
+    position: static;
+    margin-top: 0;
+  }
+
   .admin-category-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
