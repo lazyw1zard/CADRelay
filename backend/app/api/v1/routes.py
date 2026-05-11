@@ -558,25 +558,34 @@ def list_explore_model_versions_endpoint(
 
 @router.get("/explore/model-versions/{model_version_id}/thumbnail")
 def download_public_model_thumbnail(model_version_id: str) -> Response:
+    return download_public_model_preview_file(model_version_id, kind="thumbnail")
+
+
+@router.get("/explore/model-versions/{model_version_id}/download")
+def download_public_model_preview_file(
+    model_version_id: str,
+    kind: str = Query(pattern="^(glb|thumbnail)$"),
+) -> Response:
     record = get_model_version(model_version_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Model version not found")
     if (record.get("visibility") or "public") != "public" or record.get("status") != "ready":
         raise HTTPException(status_code=404, detail="Model version not found")
-    storage_key = record.get("storage_key_thumbnail_custom")
+    storage_key = record.get("storage_key_glb") if kind == "glb" else record.get("storage_key_thumbnail_custom")
     if not storage_key:
-        raise HTTPException(status_code=404, detail="thumbnail file is not available")
+        raise HTTPException(status_code=404, detail=f"{kind} file is not available")
 
     try:
         payload = load_bytes(storage_key)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="thumbnail file not found in storage") from exc
+        raise HTTPException(status_code=404, detail=f"{kind} file not found in storage") from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    media_type = "model/gltf-binary" if kind == "glb" else _thumbnail_media_type(storage_key)
     return Response(
         content=payload,
-        media_type=_thumbnail_media_type(storage_key),
+        media_type=media_type,
         headers={"Cache-Control": "public, max-age=3600"},
     )
 

@@ -233,6 +233,10 @@ export function buildPublicThumbnailUrl(modelVersionId) {
   return `${API_BASE}/explore/model-versions/${modelVersionId}/thumbnail`;
 }
 
+export function buildPublicPreviewDownloadUrl({ modelVersionId, kind }) {
+  return `${API_BASE}/explore/model-versions/${modelVersionId}/download?kind=${kind}`;
+}
+
 export function buildSharedDownloadUrl({ shareToken, kind }) {
   return `${API_BASE}/shared/model-versions/${shareToken}/download?kind=${kind}`;
 }

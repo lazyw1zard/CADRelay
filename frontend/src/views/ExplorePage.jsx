@@ -7,7 +7,12 @@ import { formatErrorMessage } from "../lib/errorMessages";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
-import { apiListModelCategories, buildPublicThumbnailUrl, withAuthToken } from "../lib/workspaceApi";
+import {
+  apiListModelCategories,
+  buildPublicPreviewDownloadUrl,
+  buildPublicThumbnailUrl,
+  withAuthToken,
+} from "../lib/workspaceApi";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 const PAGE_SIZE = 12;
@@ -145,7 +150,7 @@ export function ExplorePage() {
 
   useEffect(() => {
     // Генерируем миниатюры для карточек Explore, если есть ready GLB.
-    if (!idToken || thumbnailInProgressId) return;
+    if (thumbnailInProgressId) return;
     const next = items.find(
       (model) =>
         !model.custom_thumbnail_available &&
@@ -156,7 +161,9 @@ export function ExplorePage() {
     if (!next) return;
 
     setThumbnailInProgressId(next.id);
-    const glbUrl = withAuthToken(`${API_BASE}/model-versions/${next.id}/download?kind=glb`, idToken);
+    const glbUrl = idToken
+      ? withAuthToken(`${API_BASE}/model-versions/${next.id}/download?kind=glb`, idToken)
+      : buildPublicPreviewDownloadUrl({ modelVersionId: next.id, kind: "glb" });
     generateGlbThumbnail(glbUrl)
       .then((png) => {
         if (!isMountedRef.current || !png) return;
