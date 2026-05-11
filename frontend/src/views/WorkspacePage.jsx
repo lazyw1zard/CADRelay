@@ -22,7 +22,12 @@ import { generateGlbThumbnail } from "../lib/thumbnail";
 import { formatErrorMessage } from "../lib/errorMessages";
 import { useFavorites } from "../lib/useFavorites";
 import { useWorkspaceAuth } from "../lib/useWorkspaceAuth";
-import { signOutCurrentUser, updateCurrentUserDisplayName } from "../lib/firebaseAuth";
+import {
+  confirmCurrentUserEmailChange,
+  requestCurrentUserEmailChange,
+  signOutCurrentUser,
+  updateCurrentUserDisplayName,
+} from "../lib/firebaseAuth";
 import {
   apiDeleteCurrentAccount,
   apiDeleteModelVersion,
@@ -77,7 +82,11 @@ export function WorkspacePage() {
   const [error, setError] = useState("");
   const [profileEditing, setProfileEditing] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState("");
+  const [profileEmailDraft, setProfileEmailDraft] = useState("");
+  const [profileEmailCodeDraft, setProfileEmailCodeDraft] = useState("");
+  const [profileEmailPending, setProfileEmailPending] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileEmailSaving, setProfileEmailSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [accountDeleting, setAccountDeleting] = useState(false);
   const [editingModelId, setEditingModelId] = useState("");
@@ -120,8 +129,11 @@ export function WorkspacePage() {
 
   useEffect(() => {
     setProfileNameDraft(authUser?.displayName || "");
+    setProfileEmailDraft(authUser?.email || "");
+    setProfileEmailCodeDraft("");
+    setProfileEmailPending("");
     setProfileMessage("");
-  }, [authUser?.uid, authUser?.displayName]);
+  }, [authUser?.uid, authUser?.displayName, authUser?.email]);
 
   useEffect(() => {
     // Загружаем список моделей текущего пользователя.
@@ -436,6 +448,50 @@ export function WorkspacePage() {
     }
   }
 
+  async function requestProfileEmailCode() {
+    const nextEmail = profileEmailDraft.trim().toLowerCase();
+    setProfileMessage("");
+    if (!nextEmail || nextEmail === (authUser?.email || "").toLowerCase()) {
+      setProfileMessage("Укажи новый email.");
+      return;
+    }
+    setProfileEmailSaving(true);
+    try {
+      const result = await requestCurrentUserEmailChange(nextEmail);
+      setProfileEmailPending(result.email);
+      setProfileEmailCodeDraft("");
+      setProfileMessage(
+        result.delivery === "smtp"
+          ? "Код подтверждения отправлен на новую почту."
+          : "Код подтверждения записан в server log, SMTP пока не настроен."
+      );
+    } catch (err) {
+      setProfileMessage(formatErrorMessage(err, "Не удалось отправить код подтверждения."));
+    } finally {
+      setProfileEmailSaving(false);
+    }
+  }
+
+  async function confirmProfileEmailCode() {
+    setProfileMessage("");
+    if (!profileEmailPending || !profileEmailCodeDraft.trim()) {
+      setProfileMessage("Введи код подтверждения.");
+      return;
+    }
+    setProfileEmailSaving(true);
+    try {
+      await confirmCurrentUserEmailChange(profileEmailPending, profileEmailCodeDraft);
+      setProfileEmailPending("");
+      setProfileEmailCodeDraft("");
+      setProfileEditing(false);
+      setProfileMessage("Email обновлен и подтвержден.");
+    } catch (err) {
+      setProfileMessage(formatErrorMessage(err, "Не удалось подтвердить новый email."));
+    } finally {
+      setProfileEmailSaving(false);
+    }
+  }
+
   if (!firebaseReady) {
     return (
       <main className="page workspace-page">
@@ -508,17 +564,58 @@ export function WorkspacePage() {
               </span>
             </div>
             {profileEditing ? (
-              <div className="profile-edit-row">
-                <input
-                  value={profileNameDraft}
-                  onChange={(e) => setProfileNameDraft(e.target.value)}
-                  placeholder="Display name"
-                  aria-label="Display name"
-                />
-                <button type="button" onClick={saveProfileName} disabled={profileSaving}>
-                  <Save size={14} />
-                  {profileSaving ? "Saving..." : "Save"}
-                </button>
+              <div className="profile-edit-panel">
+                <label>
+                  Логин
+                  <div className="profile-edit-row">
+                    <input
+                      value={profileNameDraft}
+                      onChange={(e) => setProfileNameDraft(e.target.value)}
+                      placeholder="Логин"
+                      aria-label="Логин"
+                    />
+                    <button type="button" onClick={saveProfileName} disabled={profileSaving}>
+                      <Save size={14} />
+                      {profileSaving ? "Сохраняем..." : "Сохранить"}
+                    </button>
+                  </div>
+                </label>
+                <label>
+                  Email
+                  <div className="profile-edit-row">
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      value={profileEmailDraft}
+                      onChange={(e) => setProfileEmailDraft(e.target.value)}
+                      aria-label="Email"
+                    />
+                    <button type="button" onClick={requestProfileEmailCode} disabled={profileEmailSaving}>
+                      {profileEmailSaving ? "Отправляем..." : "Получить код"}
+                    </button>
+                  </div>
+                </label>
+                {profileEmailPending ? (
+                  <label>
+                    Код для {profileEmailPending}
+                    <div className="profile-edit-row">
+                      <input
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={profileEmailCodeDraft}
+                        onChange={(e) => setProfileEmailCodeDraft(e.target.value)}
+                        placeholder="6 цифр"
+                        aria-label="Код подтверждения email"
+                      />
+                      <button type="button" onClick={confirmProfileEmailCode} disabled={profileEmailSaving}>
+                        Подтвердить
+                      </button>
+                    </div>
+                  </label>
+                ) : null}
               </div>
             ) : null}
             {profileMessage ? <p className="muted" aria-live="polite">{profileMessage}</p> : null}

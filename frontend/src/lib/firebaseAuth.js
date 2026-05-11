@@ -244,4 +244,34 @@ export async function updateCurrentUserDisplayName(displayName) {
   return auth.currentUser;
 }
 
+export async function requestCurrentUserEmailChange(email) {
+  if (getAuthMode() !== "postgres") {
+    throw new Error("Email changes are handled by auth provider");
+  }
+  const token = postgresSession?.access_token || "";
+  if (!token) throw new Error("No authenticated user");
+  const resp = await postgresFetch("/me/email-change/request", {
+    method: "POST",
+    token,
+    body: { email },
+  });
+  return resp.json();
+}
+
+export async function confirmCurrentUserEmailChange(email, code) {
+  if (getAuthMode() !== "postgres") {
+    throw new Error("Email changes are handled by auth provider");
+  }
+  const token = postgresSession?.access_token || "";
+  if (!token) throw new Error("No authenticated user");
+  const resp = await postgresFetch("/me/email-change/confirm", {
+    method: "POST",
+    token,
+    body: { email, code },
+  });
+  const user = await resp.json();
+  writePostgresSession({ ...postgresSession, user });
+  return toPostgresUser(user);
+}
+
 export { getAuthMode };

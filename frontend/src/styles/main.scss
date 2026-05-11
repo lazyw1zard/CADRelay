@@ -1322,6 +1322,7 @@ textarea {
   gap: 12px;
   align-items: flex-start;
   border-color: color-mix(in srgb, var(--brand) 12%, var(--line));
+  overflow: hidden;
 }
 
 .workspace-user-avatar {
@@ -1355,8 +1356,8 @@ textarea {
 }
 
 .workspace-user-name {
-  margin: 8px 0 4px;
-  font-size: 17px;
+  margin: 10px 0 6px;
+  font-size: 19px;
   font-weight: 760;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -1390,15 +1391,28 @@ textarea {
   color: var(--success);
 }
 
+.profile-edit-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
 .profile-edit-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  margin-top: 12px;
 }
 
 .profile-edit-row button {
   white-space: nowrap;
+}
+
+.workspace-account-delete {
+  margin-top: 14px;
 }
 
 .workspace-actions-card {

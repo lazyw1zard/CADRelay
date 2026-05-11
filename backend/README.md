@@ -110,6 +110,11 @@ Backend env:
 CADRELAY_AUTH_MODE=postgres
 CADRELAY_POSTGRES_DSN=postgresql://cadrelay:cadrelay_dev@127.0.0.1:5432/cadrelay_dev
 CADRELAY_AUTH_SESSION_DAYS=30
+CADRELAY_SMTP_HOST=smtp.example.com
+CADRELAY_SMTP_PORT=587
+CADRELAY_SMTP_USERNAME=mailer@example.com
+CADRELAY_SMTP_PASSWORD=...
+CADRELAY_SMTP_FROM=no-reply@example.com
 ```
 
 Frontend env:
@@ -129,7 +134,8 @@ Notes:
 - First registered Postgres user becomes `admin`; later users default to `editor`.
 - `CADRELAY_BOOTSTRAP_ADMIN_EMAILS=email@example.com,other@example.com` can grant admin
   to known emails during rollout.
-- Email verification is treated as true until a mail provider is connected.
+- Email changes use a 6-digit confirmation code. If SMTP is not configured yet, the
+  code is written to backend logs for development/testing.
 
 ### Firebase auth
 To enable Firebase token verification:

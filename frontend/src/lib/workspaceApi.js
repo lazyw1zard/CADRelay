@@ -229,6 +229,10 @@ export function buildDownloadUrl({ modelVersionId, kind, token }) {
   return withAuthToken(`${API_BASE}/model-versions/${modelVersionId}/download?kind=${kind}`, token);
 }
 
+export function buildPublicThumbnailUrl(modelVersionId) {
+  return `${API_BASE}/explore/model-versions/${modelVersionId}/thumbnail`;
+}
+
 export function buildSharedDownloadUrl({ shareToken, kind }) {
   return `${API_BASE}/shared/model-versions/${shareToken}/download?kind=${kind}`;
 }

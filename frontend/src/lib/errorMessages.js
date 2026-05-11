@@ -17,6 +17,10 @@ export function formatErrorMessage(error, fallback = "Не удалось вып
   if (lower.includes("post /auth/login failed (401)") || lower.includes("invalid email or password")) {
     return "Неверный email или пароль.";
   }
+  if (lower.includes("post /me/email-change/confirm failed (401)") || lower.includes("confirmation code")) {
+    return "Неверный или просроченный код подтверждения.";
+  }
+  if (lower.includes("email is already registered")) return "Этот email уже зарегистрирован.";
 
   const apiMatch = raw.match(/failed \((\d{3})\):/i);
   if (apiMatch) {

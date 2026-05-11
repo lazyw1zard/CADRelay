@@ -20,6 +20,9 @@ from app.schemas.models import (
     AuthLoginRequest,
     AuthSessionResponse,
     AuthSignupRequest,
+    EmailChangeConfirmRequest,
+    EmailChangeRequest,
+    EmailChangeRequestResponse,
     ExploreModelCardResponse,
     ExploreModelListResponse,
     ModelCategoryCreate,
@@ -34,6 +37,7 @@ from app.schemas.models import (
     ShareLinkResponse,
     UploadResponse,
 )
+from app.services.email_delivery import send_email_change_code
 from app.services.firebase_auth_admin import delete_auth_user, list_auth_users, set_auth_user_role
 from app.services.metadata_store import (
     add_approval,
@@ -54,7 +58,9 @@ from app.services.metadata_store import (
     update_model_version,
 )
 from app.services.postgres_auth import (
+    confirm_email_change_code,
     create_user_session,
+    create_email_change_code,
     delete_user as delete_postgres_user,
     get_user as get_postgres_user,
     list_users as list_postgres_users,
@@ -286,6 +292,47 @@ def update_current_user_profile(
     return AdminUserResponse(**row)
 
 
+@router.post("/me/email-change/request", response_model=EmailChangeRequestResponse)
+def request_current_user_email_change(
+    payload: EmailChangeRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> EmailChangeRequestResponse:
+    if settings.auth_mode != "postgres":
+        raise HTTPException(status_code=503, detail="Email changes are handled by auth provider")
+    try:
+        pending = create_email_change_code(current_user.user_id, payload.email)
+        delivery = send_email_change_code(to_email=pending["email"], code=pending["code"])
+    except ValueError as exc:
+        message = str(exc)
+        status = 409 if "registered" in message.lower() else 400
+        raise HTTPException(status_code=status, detail=message) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to send confirmation code: {exc}") from exc
+    return EmailChangeRequestResponse(email=pending["email"], delivery=delivery)
+
+
+@router.post("/me/email-change/confirm", response_model=AdminUserResponse)
+def confirm_current_user_email_change(
+    payload: EmailChangeConfirmRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AdminUserResponse:
+    if settings.auth_mode != "postgres":
+        raise HTTPException(status_code=503, detail="Email changes are handled by auth provider")
+    try:
+        row = confirm_email_change_code(current_user.user_id, payload.email, payload.code)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except ValueError as exc:
+        message = str(exc)
+        status = 409 if "registered" in message.lower() else 400
+        raise HTTPException(status_code=status, detail=message) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return AdminUserResponse(**row)
+
+
 @router.post("/uploads", response_model=UploadResponse)
 async def upload_model(
     background_tasks: BackgroundTasks,
@@ -507,6 +554,31 @@ def list_explore_model_versions_endpoint(
     items = [_to_explore_card(row) for row in page_rows]
     next_offset = offset + limit if has_more else None
     return ExploreModelListResponse(items=items, next_offset=next_offset)
+
+
+@router.get("/explore/model-versions/{model_version_id}/thumbnail")
+def download_public_model_thumbnail(model_version_id: str) -> Response:
+    record = get_model_version(model_version_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Model version not found")
+    if (record.get("visibility") or "public") != "public" or record.get("status") != "ready":
+        raise HTTPException(status_code=404, detail="Model version not found")
+    storage_key = record.get("storage_key_thumbnail_custom")
+    if not storage_key:
+        raise HTTPException(status_code=404, detail="thumbnail file is not available")
+
+    try:
+        payload = load_bytes(storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="thumbnail file not found in storage") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return Response(
+        content=payload,
+        media_type=_thumbnail_media_type(storage_key),
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.get("/model-categories", response_model=list[ModelCategoryResponse])

@@ -7,7 +7,7 @@ import { formatErrorMessage } from "../lib/errorMessages";
 import { getCurrentIdToken, getFirebaseConfigStatus, watchAuthState } from "../lib/firebaseAuth";
 import { generateGlbThumbnail } from "../lib/thumbnail";
 import { useFavorites } from "../lib/useFavorites";
-import { apiListModelCategories, withAuthToken } from "../lib/workspaceApi";
+import { apiListModelCategories, buildPublicThumbnailUrl, withAuthToken } from "../lib/workspaceApi";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 const PAGE_SIZE = 12;
@@ -341,10 +341,10 @@ export function ExplorePage() {
             }}
           >
             <div className={`model-card-cover model-card-cover-${(idx % 3) + 1}`}>
-              {idToken && model.custom_thumbnail_available ? (
+              {model.custom_thumbnail_available ? (
                 <img
                   className="model-card-cover-img"
-                  src={withAuthToken(`${API_BASE}/model-versions/${model.id}/download?kind=thumbnail`, idToken)}
+                  src={buildPublicThumbnailUrl(model.id)}
                   alt={`${renderCardTitle(model)} custom thumbnail`}
                 />
               ) : thumbnailsById[model.id] ? (
@@ -430,7 +430,13 @@ export function ExplorePage() {
       <ModelDetailPanel
         model={selectedModel}
         idToken={idToken}
-        thumbnail={selectedModel ? thumbnailsById[selectedModel.id] : ""}
+        thumbnail={
+          selectedModel?.custom_thumbnail_available
+            ? buildPublicThumbnailUrl(selectedModel.id)
+            : selectedModel
+              ? thumbnailsById[selectedModel.id]
+              : ""
+        }
         viewerUser={authUser}
         isFavorite={selectedModel ? isFavorite(selectedModel.id) : false}
         onToggleFavorite={() => selectedModel && toggleFavorite(selectedModel)}

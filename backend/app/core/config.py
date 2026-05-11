@@ -42,6 +42,17 @@ class Settings:
         self.auth_mode = os.getenv("CADRELAY_AUTH_MODE", "disabled").strip().lower()
         self.firebase_auth_credentials = os.getenv("FIREBASE_AUTH_CREDENTIALS", "").strip()
         self.auth_session_days = int(os.getenv("CADRELAY_AUTH_SESSION_DAYS", "30"))
+        self.smtp_host = os.getenv("CADRELAY_SMTP_HOST", "").strip()
+        self.smtp_port = int(os.getenv("CADRELAY_SMTP_PORT", "587"))
+        self.smtp_username = os.getenv("CADRELAY_SMTP_USERNAME", "").strip()
+        self.smtp_password = os.getenv("CADRELAY_SMTP_PASSWORD", "").strip()
+        self.smtp_from = os.getenv("CADRELAY_SMTP_FROM", self.smtp_username).strip()
+        self.smtp_use_tls = os.getenv("CADRELAY_SMTP_USE_TLS", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self.bootstrap_admin_emails = {
             email.strip().lower()
             for email in os.getenv("CADRELAY_BOOTSTRAP_ADMIN_EMAILS", "").split(",")

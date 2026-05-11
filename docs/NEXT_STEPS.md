@@ -42,12 +42,13 @@
   - [x] keep Firebase Auth working during the transition
   - [x] add simple backend email/password auth after Postgres metadata is stable
   - [x] migrate role/email verification semantics from Firebase claims to Postgres-backed users
+  - [x] add profile email change flow with confirmation code
   - [x] run local manual Postgres auth checks:
     - signup/login for multiple users
     - workspace access
     - model upload/delete ownership flow
   - [x] enable `CADRELAY_AUTH_MODE=postgres` + `VITE_AUTH_MODE=postgres` on production after final manual signup/login/delete-account check
-  - [ ] add email confirmation for Postgres auth before public launch
+  - [ ] configure real SMTP provider for email confirmation before public launch
   - disable Firebase Auth only after the new auth path is tested end-to-end
 - [x] Replace file queue with Redis/SQS-style queue abstraction (still mock worker logic):
   - local queue backend works in MVP

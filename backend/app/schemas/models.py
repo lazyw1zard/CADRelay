@@ -155,6 +155,20 @@ class ProfileUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
 
 
+class EmailChangeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class EmailChangeConfirmRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    code: str = Field(min_length=4, max_length=12)
+
+
+class EmailChangeRequestResponse(BaseModel):
+    email: str
+    delivery: str
+
+
 class AdminUserListResponse(BaseModel):
     # Страница пользователей для админского интерфейса.
     users: list[AdminUserResponse]

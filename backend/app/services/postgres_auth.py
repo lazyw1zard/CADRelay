@@ -107,11 +107,25 @@ def init_auth_store() -> None:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_email_change_codes (
+                    id bigserial PRIMARY KEY,
+                    user_id text NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+                    email text NOT NULL,
+                    code_hash text NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    expires_at timestamptz NOT NULL
+                )
+                """
+            )
             cur.execute("CREATE INDEX IF NOT EXISTS idx_app_users_email ON app_users(email)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_app_sessions_user ON app_sessions(user_id)")
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_app_sessions_expires ON app_sessions(expires_at)"
             )
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_app_email_change_user ON app_email_change_codes(user_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_app_email_change_expires ON app_email_change_codes(expires_at)")
 
 
 def _create_session(conn: psycopg.Connection, user_id: str) -> str:
@@ -243,6 +257,78 @@ def update_user_display_name(user_id: str, display_name: str | None) -> dict[str
             )
             row = cur.fetchone()
             return _public_user(row) if row else None
+
+
+def create_email_change_code(user_id: str, email: str) -> dict[str, Any]:
+    init_auth_store()
+    normalized_email = _normalize_email(email)
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    now = _now()
+    expires_at = now + timedelta(minutes=15)
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM app_users WHERE email = %s", (normalized_email,))
+            existing = cur.fetchone()
+            if existing and existing["id"] != user_id:
+                raise ValueError("Email is already registered")
+            cur.execute("SELECT id FROM app_users WHERE id = %s", (user_id,))
+            if cur.fetchone() is None:
+                raise LookupError(f"User not found: {user_id}")
+            cur.execute("DELETE FROM app_email_change_codes WHERE user_id = %s OR expires_at <= %s", (user_id, now))
+            cur.execute(
+                """
+                INSERT INTO app_email_change_codes (user_id, email, code_hash, created_at, expires_at)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (user_id, normalized_email, _hash_token(code), now, expires_at),
+            )
+    return {"email": normalized_email, "code": code, "expires_at": expires_at}
+
+
+def confirm_email_change_code(user_id: str, email: str, code: str) -> dict[str, Any]:
+    init_auth_store()
+    normalized_email = _normalize_email(email)
+    normalized_code = "".join(ch for ch in code.strip() if ch.isdigit())
+    if len(normalized_code) != 6:
+        raise ValueError("Invalid confirmation code")
+    now = _now()
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM app_email_change_codes WHERE expires_at <= %s", (now,))
+            cur.execute(
+                """
+                SELECT *
+                FROM app_email_change_codes
+                WHERE user_id = %s
+                  AND email = %s
+                  AND code_hash = %s
+                  AND expires_at > %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (user_id, normalized_email, _hash_token(normalized_code), now),
+            )
+            pending = cur.fetchone()
+            if pending is None:
+                raise PermissionError("Invalid or expired confirmation code")
+            cur.execute("SELECT id FROM app_users WHERE email = %s", (normalized_email,))
+            existing = cur.fetchone()
+            if existing and existing["id"] != user_id:
+                raise ValueError("Email is already registered")
+            cur.execute(
+                """
+                UPDATE app_users
+                SET email = %s, email_verified = true, updated_at = %s
+                WHERE id = %s
+                RETURNING *
+                """,
+                (normalized_email, now, user_id),
+            )
+            row = cur.fetchone()
+            cur.execute("DELETE FROM app_email_change_codes WHERE user_id = %s", (user_id,))
+            if row is None:
+                raise LookupError(f"User not found: {user_id}")
+            return _public_user(row)
 
 
 def delete_user(user_id: str) -> None:
