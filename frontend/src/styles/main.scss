@@ -1191,6 +1191,35 @@ textarea {
   outline: none;
 }
 
+.auth-password-field {
+  position: relative;
+  display: block;
+}
+
+.auth-password-field input {
+  padding-right: 48px;
+}
+
+.auth-page-form .auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 36px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-faint);
+  transform: translateY(-50%);
+  box-shadow: none;
+}
+
+.auth-page-form .auth-password-toggle:hover {
+  background: var(--surface-2);
+  color: var(--brand);
+}
+
 .auth-page-form button,
 .workspace-page button,
 .admin-users-page button {

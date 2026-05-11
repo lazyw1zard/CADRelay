@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { LogIn, UserPlus } from "lucide-react";
+import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 import { BrandMark } from "../components/BrandMark";
 import {
   getFirebaseConfigStatus,
@@ -22,6 +22,8 @@ export function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -150,6 +152,9 @@ export function AuthPage() {
           <input
             type="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck="false"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@example.com"
@@ -158,25 +163,64 @@ export function AuthPage() {
 
         <label>
           Пароль
-          <input
-            type="password"
-            autoComplete={authMode === "signup" ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <span className="auth-password-field">
+            <input
+              type={showPassword ? "text" : "password"}
+              autoComplete={authMode === "signup" ? "new-password" : "current-password"}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              title={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            >
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </span>
         </label>
 
         {authMode === "signup" ? (
           <label>
             Логин
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <input
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
           </label>
         ) : null}
 
         {authMode === "signup" ? (
           <label>
             Повтори пароль
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            <span className="auth-password-field">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                onClick={() => setShowConfirmPassword((value) => !value)}
+                aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
+                title={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </span>
           </label>
         ) : null}
 

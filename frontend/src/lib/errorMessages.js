@@ -14,6 +14,9 @@ export function formatErrorMessage(error, fallback = "Не удалось вып
   if (lower.includes("auth/weak-password")) return "Пароль слишком слабый. Используй минимум 6 символов.";
   if (lower.includes("auth/too-many-requests")) return "Слишком много попыток. Подожди немного и попробуй снова.";
   if (lower.includes("auth/network-request-failed")) return "Не удалось связаться с Firebase. Проверь соединение.";
+  if (lower.includes("post /auth/login failed (401)") || lower.includes("invalid email or password")) {
+    return "Неверный email или пароль.";
+  }
 
   const apiMatch = raw.match(/failed \((\d{3})\):/i);
   if (apiMatch) {
